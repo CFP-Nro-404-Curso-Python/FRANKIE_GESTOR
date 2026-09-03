@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-# Importa módulos nativos para el manejo de persistencia en archivos CSV.
+# Importa módulos nativos para el manejo de persistencia en archivos CSV y directorios.
 import csv
 import os
 
@@ -59,14 +59,24 @@ class Stock(tk.Toplevel):
         #  FUNCIONALIDADES DE "FORMULARIO STOCK"
         # =======================================
 
-        # Definimos la constante con el nombre del archivo de persistencia.
-        ARCHIVO_CSV = "datos_stock.csv"
+        #  Encapsulamiento Y Rutas Cruzadas
+        # ----------------------------------
+        # Definimos el nombre de la carpeta contenedora.
+        CARPETA_PERSISTENCIA = "persistencia"
+
+        # Aseguramos que la carpeta exista antes de operar. exist_ok=True evita errores si ya fue creada.
+        os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
+
+        # Definimos la constante uniendo la carpeta con el nombre del archivo de persistencia.
+        ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_stock.csv")
+        RUTA_PROVEEDORES = os.path.join(CARPETA_PERSISTENCIA, "datos_proveedores.csv")
+        # --- FIN DEL CAMBIO APLICADO ---
 
         # INTEGRACIÓN: Función para leer el archivo de proveedores y extraer las Razones Sociales.
         def obtener_proveedores():
             lista_provs = []
-            if os.path.exists("datos_proveedores.csv"):
-                with open("datos_proveedores.csv", mode="r", encoding="utf-8") as archivo:
+            if os.path.exists(RUTA_PROVEEDORES):
+                with open(RUTA_PROVEEDORES, mode="r", encoding="utf-8") as archivo:
                     lector = csv.reader(archivo)
                     for fila in lector:
                         if fila: # Verificamos que la fila no esté vacía.

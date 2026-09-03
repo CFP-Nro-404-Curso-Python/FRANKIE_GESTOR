@@ -58,6 +58,20 @@ class Facturacion(tk.Toplevel):
 
 
 
+        # ================================
+        #  RUTAS DE PERSISTENCIA CRUZADAS
+        # ================================
+        # Se define la carpeta contenedora y las rutas absolutas para no perder el rastro de los maestros.
+        CARPETA_PERSISTENCIA = "persistencia"
+        os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
+
+        ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_facturacion.csv")
+        RUTA_EMPLEADOS = os.path.join(CARPETA_PERSISTENCIA, "datos_empleados.csv")
+        RUTA_CLIENTES = os.path.join(CARPETA_PERSISTENCIA, "datos_clientes.csv")
+        RUTA_STOCK = os.path.join(CARPETA_PERSISTENCIA, "datos_stock.csv")
+
+
+
         # =========================================================
         #  FUNCIONES DE EXTRACCIÓN DE DATOS MAESTROS (INTEGRACIÓN)
         # =========================================================
@@ -65,8 +79,8 @@ class Facturacion(tk.Toplevel):
         # Nueva función que permite obtener la lista de vendedores desde el archivo CSV de empleados.
         def obtener_vendedores():
             lista = []
-            if os.path.exists("datos_empleados.csv"):
-                with open("datos_empleados.csv", mode="r", encoding="utf-8") as f:
+            if os.path.exists(RUTA_EMPLEADOS):
+                with open(RUTA_EMPLEADOS, mode="r", encoding="utf-8") as f:
                     for fila in csv.reader(f):
                         if fila and len(fila) >= 2:
                             # Concatenamos Apellido y Nombre.
@@ -76,8 +90,8 @@ class Facturacion(tk.Toplevel):
         # Nueva función que permite obtener la lista de clientes desde el archivo CSV de clientes.
         def obtener_clientes():
             lista = []
-            if os.path.exists("datos_clientes.csv"):
-                with open("datos_clientes.csv", mode="r", encoding="utf-8") as f:
+            if os.path.exists(RUTA_CLIENTES):
+                with open(RUTA_CLIENTES, mode="r", encoding="utf-8") as f:
                     for fila in csv.reader(f):
                         if fila and len(fila) >= 2:
                             lista.append(f"{fila[1]}, {fila[0]}")
@@ -86,8 +100,8 @@ class Facturacion(tk.Toplevel):
         # Nueva función que permite obtener la lista de productos desde el archivo CSV de stock.
         def obtener_productos():
             lista = []
-            if os.path.exists("datos_stock.csv"):
-                with open("datos_stock.csv", mode="r", encoding="utf-8") as f:
+            if os.path.exists(RUTA_STOCK):
+                with open(RUTA_STOCK, mode="r", encoding="utf-8") as f:
                     for fila in csv.reader(f):
                         if fila and len(fila) >= 2:
                             # Concatenamos Código y Descripción
@@ -102,8 +116,8 @@ class Facturacion(tk.Toplevel):
             # Extraemos el código real separando la cadena por el guión.
             codigo_prod = seleccion.split(" - ")[0]
             
-            if os.path.exists("datos_stock.csv"):
-                with open("datos_stock.csv", mode="r", encoding="utf-8") as archivo:
+            if os.path.exists(RUTA_STOCK):
+                with open(RUTA_STOCK, mode="r", encoding="utf-8") as archivo:
                     for fila in csv.reader(archivo):
                         if fila and fila[0] == codigo_prod:
                             precio_venta = fila[7] # Índice 7 es Precio Venta en stock.py.
@@ -120,9 +134,6 @@ class Facturacion(tk.Toplevel):
         # =============================================
         #  FUNCIONALIDADES DE "FORMULARIO FACTURACIÓN"
         # =============================================
-
-        # Definimos la constante con el nombre del archivo de persistencia.
-        ARCHIVO_CSV = "datos_facturacion.csv"
 
         # Esta función lee el CSV y carga los datos en la tabla al iniciar la ventana.
         def cargar_datos_csv():
@@ -145,18 +156,20 @@ class Facturacion(tk.Toplevel):
                     valores = tabla.item(item, "values")
                     escritor.writerow(valores)
         
-        # CONTROLADOR DE TRANSACCIÓN: Lee, valida y actualiza el archivo de stock físico.
+        #  Controlador de Transacción
+        # ---------------------------- 
+        # Lee, valida y actualiza el archivo de stock físico.
         # Ahora devuelve una tupla (booleano_exito, mensaje_advertencia), que permmite procesar
         # advertencias de límite mínimo sin frenar la transacción principal.
         def gestionar_stock(codigo_buscado, variacion):
-            if not os.path.exists("datos_stock.csv"):
-                return False, "El archivo de sotck maestro no existe."
+            if not os.path.exists(RUTA_STOCK):
+                return False, "El archivo de stock maestro no existe."
             
             filas = []
             exito = False
             advertencia = ""
 
-            with open("datos_stock.csv", mode="r", encoding="utf-8") as f:
+            with open(RUTA_STOCK, mode="r", encoding="utf-8") as f:
                 lector = csv.reader(f)
                 for fila in lector:
                     if fila and fila[0] == codigo_buscado:
@@ -168,8 +181,8 @@ class Facturacion(tk.Toplevel):
                         if nuevo_stock < 0:
                             return False, f"Stock insuficiente. Quedan {int(stock_actual)} unidades."
 
-                        # Barrera preventiva: Se alcanzó el límite mínimo de inventario (sólo disparamos
-                        # advertencias cuando estamos decontando mercadería).
+                        # Barrera preventiva: Se alcanzó el límite mínimo de inventario (sólo disparamos advertencias 
+                        # cuando estamos decontando mercadería).
                         if variacion < 0 and nuevo_stock <= stock_minimo:
                             advertencia = f"El producto llegó a su stock mínimo. Quedan {int(nuevo_stock)} unidades."
                         
@@ -179,7 +192,7 @@ class Facturacion(tk.Toplevel):
             
             # Si validó correctamente, reescribimos el archivo maestro de stock.
             if exito:
-                with open("datos_stock.csv", mode="w", newline="", encoding="utf-8") as f:
+                with open(RUTA_STOCK, mode="w", newline="", encoding="utf-8") as f:
                     escritor = csv.writer(f)
                     escritor.writerows(filas)
             
@@ -199,18 +212,34 @@ class Facturacion(tk.Toplevel):
             caja_valor.config(state="readonly")
             caja_producto.focus_set()
 
-        # Esta función lee la tabla entera y recalcula el Gran Total. Previene la desincronización de estados.
+        #  Sincronización Dinámica del Total
+        # -----------------------------------
+        # Esta función lee la tabla entera y recalcula el Gran Total dinámicamente con el descuento global.
         def actualizar_total_factura():
             gran_total = 0.0
-            # get_children() devuelve los IDs de todas las filas en el Treeview.
             for item in tabla.get_children():
-                # Extraemos la tupla de valores de cada fila.
                 valores = tabla.item(item, "values")
-                # Sumamos el valor del índice 4 (Total en $).
                 gran_total += float(valores[4])
             
-            # Actualizamos la etiqueta global.
-            label_total_factura.config(text=f"TOTAL FACTURA: $ {gran_total:.2f}")
+            desc_porcentaje = 0.0
+            try:
+                if 'caja_calc_descuento' in locals() or 'caja_calc_descuento' in globals() or hasattr(self, 'children'):
+                    desc_str = caja_calc_descuento.get()
+                    if desc_str.strip():
+                        desc_porcentaje = float(desc_str)
+                        if not (0 <= desc_porcentaje <= 100):
+                            desc_porcentaje = 0.0
+            except Exception:
+                pass
+            
+            total_final = gran_total * (1 - (desc_porcentaje / 100))
+            
+            label_total_factura.config(text=f"TOTAL FACTURA: $ {total_final:.2f}")
+            
+            try:
+                label_resultado_desc.config(text=f"Total con descuento ({desc_porcentaje}%): $ {total_final:.2f}")
+            except Exception:
+                pass
 
         # Función refactorizada para guardar una nueva línea de facturación en la tabla y persistirla en el CSV.
         def guardar():
@@ -227,9 +256,8 @@ class Facturacion(tk.Toplevel):
 
                 # Validación de Límites: El descuento no puede ser negativo ni mayor a 100.
                 if descuento < 0 or descuento > 100:
-                    # Utilizamos messagebox para mostrar un error gráfico al usuario en lugar de solo imprimirlo en consola.
                     messagebox.showerror("Validación", "El descuento por producto debe estar entre 0 y 100%.")
-                    return # Cortamos la ejecución para no guardar datos anómalos.
+                    return 
 
                 # INTEGRACIÓN: Verificamos y descontamos stock antes de guardar.
                 codigo_prod = producto.split(" - ")[0]
@@ -259,7 +287,8 @@ class Facturacion(tk.Toplevel):
                 # Mensaje de error gráfico para el usuario en caso de ingresar datos no numéricos en Cantidad o Descuento.
                 messagebox.showerror("Error de Formato", "Ingrese valores numéricos válidos en Cantidad y Descuento.")
 
-        # Refactorización de la función que permite seleccionar una fila de la tabla y autocompletar los campos del formulario.
+        # Refactorización de la función que permite seleccionar una fila de la tabla y autocompletar los campos del 
+        # formulario.
         def seleccionar_fila(event):
             seleccion = tabla.selection()
             if not seleccion:
@@ -267,7 +296,7 @@ class Facturacion(tk.Toplevel):
                 
             valores = tabla.item(seleccion[0], "values")
 
-            # Desbloqueamos, rellenamos y bloqueamos para no romper el readonly
+            # Desbloqueamos, rellenamos y bloqueamos para no romper el readonly.
             caja_valor.config(state="normal")
 
             caja_producto.set(valores[0])
@@ -281,7 +310,8 @@ class Facturacion(tk.Toplevel):
             # Bloqueamos nuevamente el precio para respetar el dato del maestro de stock.
             caja_valor.config(state="readonly")
             
-        # Refactorización de la función que permite modificar una línea de facturación seleccionada en la tabla y persistir los cambios en el CSV.
+        # Refactorización de la función que permite modificar una línea de facturación seleccionada en la tabla y 
+        # persistir los cambios en el CSV.
         def modificar():
             seleccion = tabla.selection()
             if not seleccion:
@@ -291,7 +321,6 @@ class Facturacion(tk.Toplevel):
                 producto_nuevo = caja_producto.get()
                 # Validación de Producto: No se permite modificar una línea sin producto.
                 if not producto_nuevo:
-                    # Mensaje de error gráfico para el usuario en caso de intentar modificar sin seleccionar un producto.
                     messagebox.showerror("Error de Carga", "Seleccione un producto de la lista.")
                     return
 
@@ -322,7 +351,6 @@ class Facturacion(tk.Toplevel):
                 if not exito:
                     # Rollback de seguridad.
                     gestionar_stock(codigo_viejo, -cantidad_vieja)
-                    # Mensaje de error gráfico para el usuario en caso de intentar modificar con stock insuficiente.
                     messagebox.showerror("Transacción Rechazada", "Stock insuficiente para la nueva cantidad. Se ha deshecho el cambio.")
                     return
 
@@ -336,14 +364,13 @@ class Facturacion(tk.Toplevel):
                 sobrescribir_csv()
 
                 if msj_stock:
-                    # Mensaje de advertencia gráfico para el usuario en caso de alcanzar el stock mínimo.
                     messagebox.showwarning("Alerta de Reposición", msj_stock)
                 
             except ValueError:
-                # Mensaje de error gráfico para el usuario en caso de ingresar datos no numéricos en Cantidad o Descuento.
                 messagebox.showerror("Error de Formato",  "Ingrese valores numéricos válidos en Cantidad y Descuento.")
 
-        # Refactorización de la función que permite eliminar una línea de facturación seleccionada en la tabla y persistir los cambios en el CSV.
+        # Refactorización de la función que permite eliminar una línea de facturación seleccionada en la tabla y 
+        # persistir los cambios en el CSV.
         def eliminar():
             seleccion = tabla.selection()
             if not seleccion:
@@ -370,30 +397,25 @@ class Facturacion(tk.Toplevel):
         #  DESCUENTO SOBRE EL TOTAL DE FACTURA
         # =====================================
 
+        #  Recalculo Centralizado
+        # ------------------------
         def calcular_descuento_final():
             try:
-                # 1. Calculamos el total actual leyendo la tabla (Fuente de Verdad).
-                gran_total = 0.0
-                for item in tabla.get_children():
-                    valores = tabla.item(item, "values")
-                    gran_total += float(valores[4])
+                desc_str = caja_calc_descuento.get()
+                if desc_str.strip():
+                    desc_porcentaje = float(desc_str)
+                    if desc_porcentaje < 0 or desc_porcentaje > 100:
+                        messagebox.showerror("Validación", "El descuento global debe estar entre 0 y 100%.")
+                        return
                 
-                # 2. Tomamos solo el porcentaje ingresado por el usuario.
-                desc_porcentaje = float(caja_calc_descuento.get())
+                actualizar_total_factura()
 
-                # Validación del límite sobre el total global.
-                if desc_porcentaje < 0 or desc_porcentaje > 100:
-                    messagebox.showerror("Validación", "El descuento global debe estar entre 0 y 100%.")
-                    return
-                
-                # 3. Calculamos el precio final.
-                resultado = gran_total * (1 - (desc_porcentaje / 100))
-                
-                # 4. Actualizamos la vista.
-                label_resultado_desc.config(text=f"Total con descuento ({desc_porcentaje}%): $ {resultado:.2f}")
+                # Limpieza de caja posterior al cálculo
+                caja_calc_descuento.delete(0, tk.END)
+            
             except ValueError:
                 messagebox.showerror("Error", "Ingrese un porcentaje global válido.")
-
+        # --- FIN DEL CAMBIO APLICADO ---
 
 
         # =====================================
@@ -401,23 +423,20 @@ class Facturacion(tk.Toplevel):
         # =====================================
 
         tk.Label(self, text="Datos del Vendedor").grid(row=1, column=0)
-        # Reemplazado por Combobox vinculado a empleados.
         caja_datos_vendedor = ttk.Combobox(self, values=obtener_vendedores(), state="readonly", width=25)
         caja_datos_vendedor.grid(row=1, column=1)
 
         tk.Label(self, text="Datos del Cliente").grid(row=2, column=0)
-        # Reemplazado por Combobox vinculado a clientes.
         caja_datos_cliente = ttk.Combobox(self, values=obtener_clientes(), state="readonly", width=25)
         caja_datos_cliente.grid(row=2, column=1)
 
         tk.Label(self, text="").grid(row=3, column=0)
         
         tk.Label(self, text="Producto").grid(row=4, column=0)
-        # Reemplazado por Combobox vinculado a stock
         caja_producto = ttk.Combobox(self, values=obtener_productos(), state="readonly", width=25)
         caja_producto.grid(row=4, column=1)
 
-        # Binding del evento de autocompletado de precio al elegir un producto
+        # Binding del evento de autocompletado de precio al elegir un producto.
         caja_producto.bind("<<ComboboxSelected>>", autocompletar_precio)
 
         tk.Label(self, text="Cantidad").grid(row=5, column=0)
@@ -428,7 +447,7 @@ class Facturacion(tk.Toplevel):
         caja_valor = tk.Entry(self)
         caja_valor.grid(row=6, column=1)
         
-        # Bloqueamos la edición manual del precio para respetar el dato del maestro de stock
+        # Bloqueamos la edición manual del precio para respetar el dato del maestro de stock.
         caja_valor.config(state="readonly")
 
         tk.Label(self, text="Descuento en %").grid(row=7, column=0)

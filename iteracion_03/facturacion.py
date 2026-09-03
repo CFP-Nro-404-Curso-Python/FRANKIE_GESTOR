@@ -1,7 +1,7 @@
 # Es necesario exportar tkinter para que tk.Toplevel pueda ser reconocido.
 import tkinter as tk
 from tkinter import ttk
-# Importa módulos nativos para el manejo de persistencia en archivos CSV.
+# Importa módulos nativos para el manejo de persistencia en archivos CSV y directorios.
 import csv
 import os
 
@@ -60,9 +60,15 @@ class Facturacion(tk.Toplevel):
         #  FUNCIONALIDADES DE "FORMULARIO FACTURACIÓN"
         # =============================================
 
-        # Definimos la constante con el nombre del archivo de persistencia.
-        ARCHIVO_CSV = "datos_facturacion.csv"
+        # Definimos el nombre de la carpeta contenedora.
+        CARPETA_PERSISTENCIA = "persistencia"
 
+        # Aseguramos que la carpeta exista antes de operar. exist_ok=True evita errores si ya fue creada.
+        os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
+
+        # Definimos la constante uniendo la carpeta con el nombre del archivo de persistencia.
+        ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_facturacion.csv")
+        
         # Esta función lee el CSV y carga los datos en la tabla al iniciar la ventana.
         def cargar_datos_csv():
             # Se verifica si el archivo existe usando el módulo os para evitar errores en la primera ejecución.
@@ -91,7 +97,7 @@ class Facturacion(tk.Toplevel):
                 caja.delete(0, tk.END)
             caja_producto.focus_set()
 
-        # Esta función lee la tabla entera y recalcula el Gran Total. Previene la desincronización de estados.
+        # Esta función lee la tabla entera, detecta descuentos globales y sincroniza las etiquetas.
         def actualizar_total_factura():
             gran_total = 0.0
             # get_children() devuelve los IDs de todas las filas en el Treeview.
@@ -100,9 +106,33 @@ class Facturacion(tk.Toplevel):
                 valores = tabla.item(item, "values")
                 # Sumamos el valor del índice 4 (Total en $).
                 gran_total += float(valores[4])
+
+            #  Sincronización Dinámica del Total Global
+            # ------------------------------------------
+            # Buscamos de forma segura si el usuario ingresó un descuento válido en la caja.
+            desc_porcentaje = 0.0
+            try:
+                # Comprobamos que el widget ya exista en memoria antes de consultarlo.
+                if 'caja_calc_descuento' in locals() or 'caja_calc_descuento' in globals() or hasattr(self, 'children'):
+                    desc_str = caja_calc_descuento.get()
+                    if desc_str.strip():
+                        desc_porcentaje = float(desc_str)
+                        if not (0 <= desc_porcentaje <= 100):
+                            desc_porcentaje = 0.0 # Ignoramos descuentos anómalos.
+            except Exception:
+                pass # Durante el arranque del programa, si la caja no está lista, asumimos 0%.
             
-            # Actualizamos la etiqueta global.
-            label_total_factura.config(text=f"TOTAL FACTURA: $ {gran_total:.2f}")
+            # Cálculo final aplicando el descuento sobre la suma de la tabla.
+            total_final = gran_total * (1 - (desc_porcentaje / 100))
+            
+            # Actualizamos la etiqueta principal
+            label_total_factura.config(text=f"TOTAL FACTURA: $ {total_final:.2f}")
+            
+            # Sincronizamos simultáneamente la etiqueta secundaria requerida por la cátedra.
+            try:
+                label_resultado_desc.config(text=f"Total con descuento ({desc_porcentaje}%): $ {total_final:.2f}")
+            except Exception:
+                pass
 
         def guardar():
             # Manejo de excepciones básico por si el usuario ingresa letras en campos numéricos o deja vacíos.
@@ -129,7 +159,6 @@ class Facturacion(tk.Toplevel):
                 sobrescribir_csv()
                 
             except ValueError:
-                # Acá lo ideal a futuro es lanzar un tk.messagebox de error.
                 print("Error: Ingrese valores numéricos válidos.")
 
         def seleccionar_fila(event):
@@ -192,26 +221,19 @@ class Facturacion(tk.Toplevel):
         # =====================================
 
         def calcular_descuento_final():
+            # Con esta arquitectura más robusta, el botón simplemente invoca la actualización maestra validando 
+            # primero que el dato no tenga letras y esté en rango.
             try:
-                # 1. Calculamos el total actual leyendo la tabla (Fuente de Verdad).
-                gran_total = 0.0
-                for item in tabla.get_children():
-                    valores = tabla.item(item, "values")
-                    gran_total += float(valores[4])
+                desc_str = caja_calc_descuento.get()
+                if desc_str.strip():
+                    desc_porcentaje = float(desc_str)
+                    if desc_porcentaje < 0 or desc_porcentaje > 100:
+                        label_resultado_desc.config(text="Error: El descuento debe estar entre 0 y 100%.")
+                        return
                 
-                # 2. Tomamos solo el porcentaje ingresado por el usuario.
-                desc_porcentaje = float(caja_calc_descuento.get())
-
-                # Validación del límite sobre el total global.
-                if desc_porcentaje < 0 or desc_porcentaje > 100:
-                    label_resultado_desc.config(text="Error: El descuento debe estar entre 0 y 100%.")
-                    return
+                # Disparamos la actualización dinámica para ambas etiquetas
+                actualizar_total_factura()
                 
-                # 3. Calculamos el precio final.
-                resultado = gran_total * (1 - (desc_porcentaje / 100))
-                
-                # 4. Actualizamos la vista.
-                label_resultado_desc.config(text=f"Total con descuento ({desc_porcentaje}%): $ {resultado:.2f}")
             except ValueError:
                 label_resultado_desc.config(text="Error: Ingrese un porcentaje válido.")
 

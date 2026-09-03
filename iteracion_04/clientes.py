@@ -2,7 +2,7 @@
 import tkinter as tk
 # Importa ttk que contiene componentes avanzados como tablas (Treeview).
 from tkinter import ttk
-# Importa módulos nativos para el manejo de persistencia en archivos CSV.
+# Importa módulos nativos para el manejo de persistencia en archivos CSV y directorios.
 import csv
 import os
 
@@ -92,8 +92,16 @@ boton_facturacion.grid(row=0, column=3, pady=20, padx=10)
 #  FUNCIONALIDADES DE "FORMULARIO CLIENTES"
 # ==========================================
 
-# Definimos la constante con el nombre del archivo de persistencia.
-ARCHIVO_CSV = "datos_clientes.csv"
+#  Encapsulamiento de Persistencia
+# ---------------------------------
+# Definimos el nombre de la carpeta contenedora.
+CARPETA_PERSISTENCIA = "persistencia"
+
+# Aseguramos que la carpeta exista antes de operar. exist_ok=True evita errores si ya fue creada.
+os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
+
+# Definimos la constante uniendo la carpeta con el nombre del archivo de persistencia.
+ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_clientes.csv")
 
 # Esta función lee el CSV y carga los datos en la tabla al iniciar el programa.
 def cargar_datos_csv():

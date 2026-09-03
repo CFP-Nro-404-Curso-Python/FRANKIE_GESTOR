@@ -79,8 +79,17 @@ class Empleado(tk.Toplevel):
         #  FUNCIONALIDADES DE "FORMULARIO EMPLEADOS"
         # ===========================================
 
-        # Definimos la constante con el nombre del archivo de persistencia.
-        ARCHIVO_CSV = "datos_empleados.csv"
+        #  Encapsulamiento de Persistencia
+        # ---------------------------------
+        # Definimos el nombre de la carpeta contenedora.
+        CARPETA_PERSISTENCIA = "persistencia"
+
+        # Aseguramos que la carpeta exista antes de operar. exist_ok=True evita errores si ya fue creada.
+        os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
+
+        # Definimos la constante uniendo la carpeta con el nombre del archivo de persistencia.
+        ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_empleados.csv")
+        # --- FIN DEL CAMBIO APLICADO ---
 
         # Esta función lee el CSV y carga los datos en la tabla al iniciar la ventana.
         def cargar_datos_csv():

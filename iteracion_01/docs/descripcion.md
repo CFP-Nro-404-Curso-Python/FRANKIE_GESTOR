@@ -8,8 +8,8 @@ En esta etapa, dejamos atrás el esqueleto básico y le damos volumen visual al 
 ## ⚙️ Análisis Técnico y Decisiones de Diseño
 
 ### 1. Reestructuración Geométrica
-*   **Adaptación al contenido:** Notaste que el tamaño inicial de `550x550` era insuficiente para la cantidad de datos requeridos en los módulos maestros. Por ende, las ventanas de Clientes, Empleados, Proveedores y Stock se redimensionaron a `1005x550` píxeles. 
-*   **Excepción controlada:** El módulo de Facturación se ajustó a `550x600`, una decisión coherente dado que su diseño es más vertical por la calculadora inferior.
+*   **Adaptación al contenido:** Notaste que el tamaño inicial de `400x300` era insuficiente para la cantidad de datos requeridos en los módulos maestros. Por ende, las ventanas de Clientes, Empleados, Proveedores y Stock se redimensionaron a `1005x550` píxeles. 
+*   **Excepción controlada:** El módulo de Facturación se ajustó a `590x640`, una decisión coherente dado que su diseño es más vertical por la calculadora inferior.
 
 ### 2. Implementación de Formularios de Entrada (Inputs)
 *   En todos los módulos se implementó un sistema de grilla bidimensional (`grid`) alineando etiquetas (`tk.Label`) en la columna 0 y cajas de texto (`tk.Entry`) en la columna 1.
@@ -31,8 +31,7 @@ En esta etapa, dejamos atrás el esqueleto básico y le damos volumen visual al 
 
 ---
 
-## 🛑 Evaluación Crítica (Ojo de Analista)
-Como tu mentor, te aplaudo el orden lógico de la interfaz, pero te levanto una bandera roja enorme a nivel arquitectura: **Absolutamente todos los inputs son `tk.Entry` de texto libre**. 
+## 🛑 Evaluación Crítica
 
 En Análisis de Sistemas, permitir texto libre en campos que requieren validación numérica (Sueldo, DNI, Stock) o en campos que actúan como claves foráneas relacionales (Proveedor, Cliente, Producto) es la receta perfecta para corromper la integridad de tus datos. Un usuario podría escribir "diez" en lugar de "10" en el campo Cantidad, o errar al tipear el CUIT del Proveedor. 
 

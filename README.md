@@ -18,7 +18,7 @@ El desarrollo se divide en seis etapas incrementales. Cada carpeta contiene el c
 | Iteración | Foco del Desarrollo | Análisis Detallado |
 | :--- | :--- | :--- |
 | **Iteración 0** | Esqueleto arquitectónico, jerarquía de Toplevels y sistema de navegación. | [📖 Ver descripcion.md](./iteracion_00/docs/descripcion.md) |
-| **Iteración 1** | Maquetado de Interfaz de Usuario (UI), Layouts y grillas Treeview. | [📖 Ver descripcion.md](./iteracion_01/descripcion.md) |
+| **Iteración 1** | Maquetado de Interfaz de Usuario (UI), Layouts y grillas Treeview. | [📖 Ver descripcion.md](./iteracion_01/docs/descripcion.md) |
 | **Iteración 2** | Lógica CRUD en memoria RAM (volátil), DOM de Tkinter y manejo de eventos. | [📖 Ver descripcion.md](./iteracion_02/descripcion.md) |
 | **Iteración 3** | Persistencia mediante archivos planos (CSV) y sincronización destructiva. | [📖 Ver descripcion.md](./iteracion_03/descripcion.md) |
 | **Iteración 4** | Integridad referencial cruzada entre CSVs, motor transaccional simulado y manejo de excepciones visuales. | [📖 Ver descripcion.md](./iteracion_04/descripcion.md) |

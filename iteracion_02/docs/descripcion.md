@@ -35,8 +35,8 @@ El archivo `facturacion.py` empieza a destacarse como el nodo de procesamiento m
 
 ---
 
-## 🛑 Evaluación Crítica (Ojo de Analista)
-Como analista, te marco las dos falencias sistémicas más graves de esta iteración:
+## 🛑 Evaluación Crítica
+Falencias sistémicas a corregir más graves de esta iteración:
 
 1.  **Volatilidad Total de Datos (Amnesia del Sistema):**
     Toda la información se aloja en el árbol visual (`ttk.Treeview`). Al no existir una capa de persistencia (archivo físico o base de datos relacional), el ciclo de vida de los datos es idéntico al del proceso. Si el usuario cierra el programa (o hay un corte de energía), la pérdida de información es absoluta y catastrófica. 

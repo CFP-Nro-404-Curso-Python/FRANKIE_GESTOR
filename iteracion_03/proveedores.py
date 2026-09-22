@@ -59,9 +59,12 @@ class Proveedor(tk.Toplevel):
         #  FUNCIONALIDADES DE "FORMULARIO PROVEEDORES"
         # =============================================
 
-        # Definimos el nombre de la carpeta contenedora.
-        CARPETA_PERSISTENCIA = "persistencia"
+        # Obtenemos la ruta absoluta del directorio exacto donde está alojado este script (.py).
+        DIRECTORIO_ACTUAL = os.path.dirname(os.path.abspath(__file__))
 
+        # Definimos el nombre de la carpeta contenedora y unimos esa ruta absoluta con el nombre de la carpeta contenedora.
+        CARPETA_PERSISTENCIA = os.path.join(DIRECTORIO_ACTUAL, "persistencia")
+        
         # Aseguramos que la carpeta exista antes de operar. exist_ok=True evita errores si ya fue creada.
         os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
 

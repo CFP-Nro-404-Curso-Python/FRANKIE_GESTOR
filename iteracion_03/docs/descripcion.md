@@ -11,12 +11,12 @@ En esta fase, la aplicación da el salto más crítico para cualquier sistema de
 *   Se importaron las librerías `csv` y `os` en la cabecera de los cinco módulos principales.
 *   El uso del submódulo `os.path.exists()` es una excelente práctica defensiva: evita que el sistema lance un `FileNotFoundError` y crashee si el archivo `.csv` todavía no fue creado en la primera ejecución del programa.
 
-### 2. Encapsulamiento de Persistencia (Separation of Concerns)
-*   Se implementó la creación dinámica de un directorio aislado mediante `os.makedirs("persistencia", exist_ok=True)`. Esta es una práctica de arquitectura clave: separa el código fuente (`.py`) de los datos generados por el usuario (`.csv`), manteniendo la raíz del proyecto limpia.
-*   El uso de `exist_ok=True` y `os.path.join()` aplica un **Patrón Defensivo**, asegurando que cada módulo garantice la existencia de su propio entorno de trabajo antes de intentar escribir en disco, independientemente de si se ejecuta desde el script principal o de forma aislada.
+### 2. Encapsulamiento de Persistencia (Separation of Concerns y Portabilidad)
+*   Se implementó la creación dinámica de un directorio aislado anclado a la ubicación física del script fuente mediante la combinación de `os.path.abspath(__file__)` y `os.path.dirname()`. Esta es una práctica de arquitectura clave: separa el código fuente (`.py`) de los datos generados por el usuario (`.csv`), garantizando una ruta absoluta segura que evita que la carpeta "persistencia" se genere en el Current Working Directory (CWD) y contamine el entorno.
+*   El uso de `exist_ok=True` y `os.path.join()` aplica un **Patrón Defensivo**, asegurando que cada módulo garantice la existencia de su propio entorno de trabajo de forma escalable y sin errores de jerarquía.
 
 ### 3. Flujo de Inicialización (Lectura)
-*   Se definió una constante global en cada módulo armando la ruta relativa (ej. `ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_clientes.csv")`). 
+*   Se definió una constante global en cada módulo armando la ruta absoluta (ej. `ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_clientes.csv")`). 
 *   La función `cargar_datos_csv()` actúa como el motor de arranque: abre el archivo en modo lectura (`mode="r"`), itera sobre las filas y las inyecta en el widget `ttk.Treeview`. Esto convierte a la grilla visual en una representación exacta de la base de datos física al momento del despliegue.
 
 ### 4. Sincronización Destructiva (Escritura)
@@ -41,9 +41,9 @@ En esta fase, la aplicación da el salto más crítico para cualquier sistema de
 ---
 
 ## 🛑 Evaluación Crítica (Ojo de Analista)
-Lograste la persistencia, pero ahora tu sistema se enfrenta al problema de la **Fragmentación y Falta de Integridad Referencial**.
+Se logró la persistencia, pero ahora el sistema se enfrenta al problema de la **Fragmentación y Falta de Integridad Referencial**.
 
-1.  **Silos de Información:** Tenés cinco bases de datos totalmente aisladas. Si en el módulo Facturación el usuario tipea el nombre de un cliente que no existe en `datos_clientes.csv`, el sistema lo permite sin problemas. 
+1.  **Silos de Información:** Hay cinco bases de datos totalmente aisladas. Si en el módulo Facturación el usuario tipea el nombre de un cliente que no existe en `datos_clientes.csv`, el sistema lo permite sin problemas. 
 2.  **Entradas Libres Peligrosas:** Todos los campos de relación (ej. "Vendedor", "Cliente", "Producto" en Facturación; "Proveedor" en Stock) siguen siendo `tk.Entry`. Esto es una bomba de tiempo para la calidad de los datos, ya que da pie a errores de tipeo y desincronización.
 
 **Próximo paso ineludible (Iteración 04):** Transformar esos campos clave en listas desplegables restrictivas (`ttk.Combobox`) y programar la lógica para que los módulos empiecen a leerse entre sí, cruzando los datos para garantizar la integridad referencial.

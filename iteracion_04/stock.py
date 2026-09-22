@@ -59,10 +59,11 @@ class Stock(tk.Toplevel):
         #  FUNCIONALIDADES DE "FORMULARIO STOCK"
         # =======================================
 
-        #  Encapsulamiento Y Rutas Cruzadas
-        # ----------------------------------
-        # Definimos el nombre de la carpeta contenedora.
-        CARPETA_PERSISTENCIA = "persistencia"
+        # Obtenemos la ruta absoluta del directorio exacto donde está alojado este script (.py).
+        DIRECTORIO_ACTUAL = os.path.dirname(os.path.abspath(__file__))
+
+        # Definimos el nombre de la carpeta contenedora y unimos esa ruta absoluta con el nombre de la carpeta contenedora.
+        CARPETA_PERSISTENCIA = os.path.join(DIRECTORIO_ACTUAL, "persistencia")
 
         # Aseguramos que la carpeta exista antes de operar. exist_ok=True evita errores si ya fue creada.
         os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
@@ -70,7 +71,6 @@ class Stock(tk.Toplevel):
         # Definimos la constante uniendo la carpeta con el nombre del archivo de persistencia.
         ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_stock.csv")
         RUTA_PROVEEDORES = os.path.join(CARPETA_PERSISTENCIA, "datos_proveedores.csv")
-        # --- FIN DEL CAMBIO APLICADO ---
 
         # INTEGRACIÓN: Función para leer el archivo de proveedores y extraer las Razones Sociales.
         def obtener_proveedores():

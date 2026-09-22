@@ -14,7 +14,7 @@ class Facturacion(tk.Toplevel):
         super().__init__(parent)
 
         self.title("FORMULARIO FACTURACIÓN")
-        self.geometry("600x680")
+        self.geometry("570x640")
 
 
 
@@ -61,10 +61,17 @@ class Facturacion(tk.Toplevel):
         # ================================
         #  RUTAS DE PERSISTENCIA CRUZADAS
         # ================================
-        # Se define la carpeta contenedora y las rutas absolutas para no perder el rastro de los maestros.
-        CARPETA_PERSISTENCIA = "persistencia"
+        
+        # Obtenemos la ruta absoluta del directorio exacto donde está alojado este script (.py).
+        DIRECTORIO_ACTUAL = os.path.dirname(os.path.abspath(__file__))
+
+        # Definimos el nombre de la carpeta contenedora y unimos esa ruta absoluta con el nombre de la carpeta contenedora.
+        CARPETA_PERSISTENCIA = os.path.join(DIRECTORIO_ACTUAL, "persistencia")
+        
+        # Aseguramos que la carpeta exista antes de operar. exist_ok=True evita errores si ya fue creada.
         os.makedirs(CARPETA_PERSISTENCIA, exist_ok=True)
 
+        # Definimos la constante uniendo la carpeta con el nombre del archivo de persistencia.
         ARCHIVO_CSV = os.path.join(CARPETA_PERSISTENCIA, "datos_facturacion.csv")
         RUTA_EMPLEADOS = os.path.join(CARPETA_PERSISTENCIA, "datos_empleados.csv")
         RUTA_CLIENTES = os.path.join(CARPETA_PERSISTENCIA, "datos_clientes.csv")

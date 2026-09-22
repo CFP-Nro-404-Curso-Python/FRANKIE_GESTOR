@@ -1,9 +1,7 @@
 # 🏗️ Iteración 04: Integridad Referencial, Motor Transaccional y Validaciones Cruzadas
 
 ## 📌 Resumen de la Iteración
-Acá es donde el sistema deja de ser una simple agenda y se convierte en un **verdadero software de gestión comercial**
-. En esta iteración, abandonamos los "silos de información" y conectamos los módulos entre sí para lograr la integridad referencial que nos faltaba
-. Fabricamos "a mano" el comportamiento de una base de datos relacional sobre archivos planos (CSV), controlando el inventario en tiempo real, bloqueando el error humano y estableciendo un manejo estricto de las excepciones mediante interfaces gráficas (Pop-ups). 
+Acá es donde el sistema deja de ser una simple agenda y se convierte en un **verdadero software de gestión comercial**. En esta iteración, abandonamos los "silos de información" y conectamos los módulos entre sí para lograr la integridad referencial que nos faltaba. Fabricamos "a mano" el comportamiento de una base de datos relacional sobre archivos planos (CSV), controlando el inventario en tiempo real, bloqueando el error humano y estableciendo un manejo estricto de las excepciones mediante interfaces gráficas (Pop-ups). 
 
 ---
 
@@ -28,9 +26,9 @@ El módulo de Facturación ahora actúa como el "cerebro" orquestador mediante l
 *   **Barreras Duras (`showerror`):** Frena operaciones no válidas como ingresos de letras en campos numéricos, descuentos mayores al 100%, o intentos de vender sin stock suficiente.
 *   **Alertas Tempranas (`showwarning`):** Al procesar un descuento de inventario, si el stock actual perfora el "Stock Mínimo" parametrizado, el sistema permite la venta pero arroja una "Alerta de Reposición" amarilla para notificar al usuario.
 
-### 5. Consolidación de Rutas Cruzadas (Paths)
-*   Al confinar todos los archivos `.csv` en el directorio unificado `persistencia/`, las operaciones de lectura cruzada (ej. Facturación leyendo el maestro de Stock) corrían riesgo de fallar.
-*   Se implementó la declaración temprana de rutas absolutas mediante `os.path.join()` en las cabeceras operativas (`RUTA_EMPLEADOS`, `RUTA_STOCK`, etc.). Esto garantiza la cohesión de los datos y evita caídas en tiempo de ejecución.
+### 5. Consolidación de Rutas Cruzadas (Cohesión Espacial)
+*   Al confinar todos los archivos `.csv` en un directorio unificado, las operaciones de lectura cruzada (ej. Facturación leyendo el maestro de Stock) corrían riesgo de fallar si se ejecutaban desde distintos contextos.
+*   Se implementó la declaración temprana de **verdaderas rutas absolutas dinámicas** ancladas al script mediante `os.path.dirname(os.path.abspath(__file__))`. Al combinar esto con `os.path.join()` en las cabeceras operativas (`RUTA_EMPLEADOS`, `RUTA_STOCK`, etc.), se garantiza la cohesión espacial de los datos. Esto asegura que el sistema siempre encuentre los archivos maestros, independientemente de cuál sea el Directorio de Trabajo Actual (CWD) del sistema operativo.
 
 ---
 
@@ -44,8 +42,8 @@ El módulo de Facturación ahora actúa como el "cerebro" orquestador mediante l
 
 ---
 
-## 🛑 Evaluación Crítica (Ojo de Analista)
-Como analista, te doy la derecha: lograste exprimir al máximo las capacidades de los archivos planos (CSV). El sistema es robusto, valida límites lógicos, bloquea ingresos anómalos y mantiene el inventario al día. Cumple al 100% con los requerimientos de un trabajo académico.
+## 🛑 Evaluación Crítica
+Se logró exprimir al máximo las capacidades de los archivos planos (CSV). El sistema es robusto, valida límites lógicos, bloquea ingresos anómalos y mantiene el inventario al día. Cumple al 100% con los requerimientos de un trabajo académico.
 
 Sin embargo, acá está el límite del pragmatismo. **En un entorno de producción real, este diseño es altamente ineficiente e inseguro**. Abrir, iterar, reescribir y cerrar archivos de texto múltiples veces por cada click en la interfaz genera un cuello de botella enorme y no soporta concurrencia (dos vendedores facturando al mismo tiempo destruirían el archivo `datos_stock.csv`). 
 

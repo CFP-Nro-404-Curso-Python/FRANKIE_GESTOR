@@ -40,7 +40,7 @@ En esta fase, la aplicación da el salto más crítico para cualquier sistema de
 
 ---
 
-## 🛑 Evaluación Crítica (Ojo de Analista)
+## 🛑 Evaluación Crítica
 Se logró la persistencia, pero ahora el sistema se enfrenta al problema de la **Fragmentación y Falta de Integridad Referencial**.
 
 1.  **Silos de Información:** Hay cinco bases de datos totalmente aisladas. Si en el módulo Facturación el usuario tipea el nombre de un cliente que no existe en `datos_clientes.csv`, el sistema lo permite sin problemas. 

@@ -12,7 +12,7 @@ class Facturacion(tk.Toplevel):
         super().__init__(parent)
 
         self.title("FORMULARIO FACTURACIÓN")
-        self.geometry("570x650")
+        self.geometry("520x640")
 
 
 

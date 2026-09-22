@@ -25,7 +25,7 @@ from facturacion import Facturacion
 # Crea la ventana principal.
 ventana = tk.Tk()
 # Define tamaño ancho y alto.
-ventana.geometry("550x550")
+ventana.geometry("400x300")
 # Cambia el título.
 ventana.title("FORMULARIO CLIENTES")
 

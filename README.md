@@ -13,16 +13,16 @@ Este repositorio contiene el desarrollo progresivo de una aplicación de escrito
 
 ## 📂 Estructura del Proyecto e Iteraciones
 
-El desarrollo se divide en seis etapas incrementales. Cada carpeta contiene el código fuente de la iteración y su respectivo análisis técnico detallado en el archivo `DESCRIPCION.md`.
+El desarrollo se divide en seis etapas incrementales. Cada carpeta contiene el código fuente de la iteración y su respectivo análisis técnico detallado en el archivo `descripcion.md`.
 
 | Iteración | Foco del Desarrollo | Análisis Detallado |
 | :--- | :--- | :--- |
-| **Iteración 0** | Esqueleto arquitectónico, jerarquía de Toplevels y sistema de navegación. | [📖 Ver DESCRIPCION.md](./iteracion_00/DESCRIPCION.md) |
-| **Iteración 1** | Maquetado de Interfaz de Usuario (UI), Layouts y grillas Treeview. | [📖 Ver DESCRIPCION.md](./iteracion_01/DESCRIPCION.md) |
-| **Iteración 2** | Lógica CRUD en memoria RAM (volátil), DOM de Tkinter y manejo de eventos. | [📖 Ver DESCRIPCION.md](./iteracion_02/DESCRIPCION.md) |
-| **Iteración 3** | Persistencia mediante archivos planos (CSV) y sincronización destructiva. | [📖 Ver DESCRIPCION.md](./iteracion_03/DESCRIPCION.md) |
-| **Iteración 4** | Integridad referencial cruzada entre CSVs, motor transaccional simulado y manejo de excepciones visuales. | [📖 Ver DESCRIPCION.md](./iteracion_04/DESCRIPCION.md) |
-| **Iteración 5** | Migración definitiva a motor relacional (SQLite3), identificadores ocultos (IID), operaciones ACID y anclaje estricto de rutas. | [📖 Ver DESCRIPCION.md](./iteracion_05/DESCRIPCION.md) |
+| **Iteración 0** | Esqueleto arquitectónico, jerarquía de Toplevels y sistema de navegación. | [📖 Ver descripcion.md](./iteracion_00/docs/descripcion.md) |
+| **Iteración 1** | Maquetado de Interfaz de Usuario (UI), Layouts y grillas Treeview. | [📖 Ver descripcion.md](./iteracion_01/descripcion.md) |
+| **Iteración 2** | Lógica CRUD en memoria RAM (volátil), DOM de Tkinter y manejo de eventos. | [📖 Ver descripcion.md](./iteracion_02/descripcion.md) |
+| **Iteración 3** | Persistencia mediante archivos planos (CSV) y sincronización destructiva. | [📖 Ver descripcion.md](./iteracion_03/descripcion.md) |
+| **Iteración 4** | Integridad referencial cruzada entre CSVs, motor transaccional simulado y manejo de excepciones visuales. | [📖 Ver descripcion.md](./iteracion_04/descripcion.md) |
+| **Iteración 5** | Migración definitiva a motor relacional (SQLite3), identificadores ocultos (IID), operaciones ACID y anclaje estricto de rutas. | [📖 Ver descripcion.md](./iteracion_05/descripcion.md) |
 
 > 💡 **Nota sobre la Persistencia:** A partir de la Iteración 3, el sistema encapsula sus datos. Las iteraciones 3 y 4 generan y consumen archivos `.csv` alojados en una carpeta `/persistencia`. La **Iteración 5** (versión definitiva) automatiza la creación de un directorio estricto `/db` donde compila la base de datos relacional `frankie_gestor.db`.
 

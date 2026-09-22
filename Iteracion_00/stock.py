@@ -7,7 +7,7 @@ class Stock(tk.Toplevel):
         super().__init__(parent)
 
         self.title("FORMULARIO STOCK")
-        self.geometry("550x550")
+        self.geometry("400x300")
 
     
 

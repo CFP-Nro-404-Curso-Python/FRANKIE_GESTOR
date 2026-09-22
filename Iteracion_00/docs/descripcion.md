@@ -25,13 +25,10 @@ Uno de los mayores aciertos de esta base estructural es la mitigación del acopl
 
 ## 🛠️ Estructura de Archivos Actual
 
-*   📄 **`clientes.py`**: Interfaz raíz seteada en `550x550` píxeles. Posee únicamente los cuatro botones de navegación mediante el método `.grid()`.
-*   📄 **`empleados.py`**: Clase `Empleado` (Toplevel) seteada en `550x550` píxeles.
-*   📄 **`proveedores.py`**: Clase `Proveedor` (Toplevel) seteada en `550x550` píxeles.
-*   📄 **`stock.py`**: Clase `Stock` (Toplevel) seteada en `550x550` píxeles.
-*   📄 **`facturacion.py`**: Clase `Facturacion` (Toplevel) seteada en `550x550` píxeles.
+*   📄 **`clientes.py`**: Interfaz raíz seteada en `400x300` píxeles. Posee únicamente los cuatro botones de navegación mediante el método `.grid()`.
+*   📄 **`empleados.py`**: Clase `Empleado` (Toplevel) seteada en `400x300` píxeles.
+*   📄 **`proveedores.py`**: Clase `Proveedor` (Toplevel) seteada en `400x300` píxeles.
+*   📄 **`stock.py`**: Clase `Stock` (Toplevel) seteada en `400x300` píxeles.
+*   📄 **`facturacion.py`**: Clase `Facturacion` (Toplevel) seteada en `400x300` píxeles.
 
 ---
-
-## 🛑 Evaluación Crítica
-Como tu mentor, te analizo el código sin anestesia: esta base es sólida para arrancar, pero la geometría estática de `550x550` va a quedar obsoleta de inmediato. En cuanto empieces a diagramar las cajas de texto (`Entry`) y las tablas de visualización de datos (`Treeview`), los widgets van a colisionar o a quedar fuera de los límites de la pantalla. El próximo paso lógico es expandir estas dimensiones y construir los esquemas visuales de los formularios (UI) antes de pensar en cualquier tipo de lógica de persistencia.

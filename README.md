@@ -21,8 +21,8 @@ El desarrollo se divide en seis etapas incrementales. Cada carpeta contiene el c
 | **Iteración 1** | Maquetado de Interfaz de Usuario (UI), Layouts y grillas Treeview. | [📖 Ver descripcion.md](./iteracion_01/docs/descripcion.md) |
 | **Iteración 2** | Lógica CRUD en memoria RAM (volátil), DOM de Tkinter y manejo de eventos. | [📖 Ver descripcion.md](./iteracion_02/docs/descripcion.md) |
 | **Iteración 3** | Persistencia mediante archivos planos (CSV) y sincronización destructiva. | [📖 Ver descripcion.md](./iteracion_03/docs/descripcion.md) |
-| **Iteración 4** | Integridad referencial cruzada entre CSVs, motor transaccional simulado y manejo de excepciones visuales. | [📖 Ver descripcion.md](./iteracion_04/descripcion.md) |
-| **Iteración 5** | Migración definitiva a motor relacional (SQLite3), identificadores ocultos (IID), operaciones ACID y anclaje estricto de rutas. | [📖 Ver descripcion.md](./iteracion_05/descripcion.md) |
+| **Iteración 4** | Integridad referencial cruzada entre CSVs, motor transaccional simulado y manejo de excepciones visuales. | [📖 Ver descripcion.md](./iteracion_04/docs/descripcion.md) |
+| **Iteración 5** | Migración definitiva a motor relacional (SQLite3), identificadores ocultos (IID), operaciones ACID y anclaje estricto de rutas. | [📖 Ver descripcion.md](./iteracion_05/docs/descripcion.md) |
 
 > 💡 **Nota sobre la Persistencia:** A partir de la Iteración 3, el sistema encapsula sus datos. Las iteraciones 3 y 4 generan y consumen archivos `.csv` alojados en una carpeta `/persistencia`. La **Iteración 5** (versión definitiva) automatiza la creación de un directorio estricto `/db` donde compila la base de datos relacional `frankie_gestor.db`.
 

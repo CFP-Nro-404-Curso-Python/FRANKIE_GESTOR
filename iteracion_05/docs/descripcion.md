@@ -34,7 +34,7 @@ El sistema evolucionó de un prototipo basado en archivos planos (CSV) a una arq
 
 ---
 
-## 🛑 Evaluación Crítica y Cierre del Proyecto
+## 🛑 Evaluación Crítica
 Con esta iteración, el desarrollo alcanza un estándar técnico profesional. Pasamos de manejar cadenas de texto frágiles a delegar la integridad de los datos en un motor ACID (Atomicidad, Consistencia, Aislamiento y Durabilidad). 
 
 El uso del `iid` en Tkinter demuestra madurez en la separación entre la Vista (lo que ve el usuario) y el Modelo (lo que procesa la base de datos). El sistema es escalable, cohesivo y está listo para ser compilado en un ejecutable final para producción.

@@ -112,7 +112,7 @@ def validar_ingreso():
         # Lazy Import del futuro Panel de Control (panel_control).
         from panel_control import PanelControl
 
-        # CAMBIO: Pasamos los nuevos argumentos para el ruteo de datos hacia el Panel de Control.
+        # Pasamos los nuevos argumentos para el ruteo de datos hacia el Panel de Control.
         PanelControl(ventana, rol_usuario, nombres_usuario, apellidos_usuario)
     else:
         intentos_fallidos += 1

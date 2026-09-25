@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import messagebox
+# Se importa ttk para poder validar el tipo de widget (ttk.Combobox) en el menú contextual global.
+from tkinter import ttk, messagebox
 import sqlite3
 import os
 #Se importa bcrypt para aplicar criptografía de estándar empresarial a las credenciales.
@@ -67,6 +68,59 @@ ventana.title("FRANKIE GESTOR - ACCESO AL SISTEMA")
 ventana.geometry("400x250")
 ventana.eval('tk::PlaceWindow . center') # Centramos la ventana de login.
 ventana.resizable(False, False)
+
+
+
+# ===============================================
+#  INYECCIÓN GLOBAL DE EVENTOS (USABILIDAD Y UX)
+# ===============================================
+
+# Principio DRY. Se inyecta un menú contextual y atajos de teclado forzados a nivel clase (bind_class). 
+# Al aplicarse al objeto raíz (ventana), este comportamiento se hereda automáticamente a todos los Toplevels, 
+# Entries y Comboboxes de la aplicación.
+
+# 1. Construcción del Menú Contextual en memoria
+menu_contextual = tk.Menu(ventana, tearoff=0)
+menu_contextual.add_command(label="Copiar", command=lambda: ventana.focus_get().event_generate("<<Copy>>"))
+menu_contextual.add_command(label="Cortar", command=lambda: ventana.focus_get().event_generate("<<Cut>>"))
+menu_contextual.add_command(label="Pegar", command=lambda: ventana.focus_get().event_generate("<<Paste>>"))
+menu_contextual.add_separator()
+menu_contextual.add_command(label="Seleccionar Todo", command=lambda: ventana.focus_get().event_generate("<<SelectAll>>"))
+
+def desplegar_menu(event):
+    # Condicional de seguridad: Solo se despliega si se hace clic derecho sobre un widget de entrada de texto válido.
+    if isinstance(event.widget, (tk.Entry, tk.Text, ttk.Combobox)):
+        event.widget.focus_set()
+        menu_contextual.tk_popup(event.x_root, event.y_root)
+
+# Inyectamos el evento de Clic Derecho (<Button-3>) a las clases nativas.
+ventana.bind_class("Entry", "<Button-3>", desplegar_menu)
+ventana.bind_class("TCombobox", "<Button-3>", desplegar_menu)
+ventana.bind_class("Text", "<Button-3>", desplegar_menu)
+
+# 2. Refuerzo de Atajos de Teclado (Previene fallos por distribuciones de teclado ISO/Español o Bloq Mayús)
+def forzar_atajo(evento, evento_virtual):
+    evento.widget.event_generate(evento_virtual)
+    return "break" # Detiene la propagación para evitar duplicaciones nativas del OS.
+
+# Mapeamos minúsculas y mayúsculas para que el atajo funcione sin importar el estado del teclado.
+atajos_globales = {
+    "<Control-c>": "<<Copy>>", "<Control-C>": "<<Copy>>",
+    "<Control-x>": "<<Cut>>", "<Control-X>": "<<Cut>>",
+    "<Control-v>": "<<Paste>>", "<Control-V>": "<<Paste>>",
+    "<Control-a>": "<<SelectAll>>", "<Control-A>": "<<SelectAll>>"
+}
+
+for clase in ["Entry", "TCombobox", "Text"]:
+    for combinacion_teclas, accion_virtual in atajos_globales.items():
+        # Uso de variable por defecto (ev=accion_virtual) para evitar problemas de "Late Binding" en la lambda de Python.
+        ventana.bind_class(clase, combinacion_teclas, lambda e, ev=accion_virtual: forzar_atajo(e, ev))
+
+
+
+# =======================================
+#  FUNCIONALIDADES Y VALIDACIÓN DE LOGIN
+# =======================================
 
 # Variable global para el control de intentos.
 intentos_fallidos = 0

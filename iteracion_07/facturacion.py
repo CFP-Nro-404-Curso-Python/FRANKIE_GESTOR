@@ -52,7 +52,11 @@ class Facturacion(tk.Toplevel):
                 conexion = sqlite3.connect(DB_PATH)
                 cursor = conexion.cursor()
                 try:
-                    cursor.execute("SELECT nombres, apellidos FROM empleados")
+                    # CAMBIO: Aplicación de filtrado condicional estricto. 
+                    # Se limita la consulta a la tabla 'usuarios' utilizando una cláusula WHERE exacta para traer 
+                    # EXCLUSIVAMENTE al personal con el rol 'Empleado - Ventas', bloqueando la aparición de Administradores,
+                    # Gerentes y personal de Compras para preservar la lógica de negocio y la segregación de funciones.
+                    cursor.execute("SELECT nombres, apellidos FROM usuarios WHERE rol = 'Empleado - Ventas'")
                     for fila in cursor.fetchall():
                         lista.append(f"{fila[1]}, {fila[0]}")
                 except sqlite3.OperationalError:
@@ -374,7 +378,7 @@ class Facturacion(tk.Toplevel):
         caja_datos_cliente = ttk.Combobox(self, values=obtener_clientes(), state="readonly", width=25)
         caja_datos_cliente.grid(row=2, column=1)
 
-        tk.Label(self, text="").grid(row=3, column=0) # Espaciador
+        tk.Label(self, text="").grid(row=3, column=0) # Espaciador.
         
         tk.Label(self, text="Producto").grid(row=4, column=0, pady=5, sticky="e", padx=5)
         caja_producto = ttk.Combobox(self, values=obtener_productos(), state="readonly", width=25)
@@ -399,6 +403,7 @@ class Facturacion(tk.Toplevel):
         # =========================================================
         #  BOTONES "GUARDAR, MODIFICAR, ELIMINAR Y CERRAR VENTANA"
         # =========================================================
+
         boton_guardar = tk.Button(self, text="Guardar Facturación", command=guardar, bg="#4CAF50", fg="white", font=("Arial", 9, "bold"), width=18)
         boton_guardar.grid(row=4, column=3, padx=20)
 

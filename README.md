@@ -7,7 +7,7 @@
 
 ## 📌 Descripción del Proyecto
 
-Este repositorio contiene el desarrollo progresivo de una aplicación de escritorio para la gestión comercial (Clientes, Empleados, Proveedores, Stock y Facturación). El proyecto está estructurado en iteraciones evolutivas, demostrando cómo un sistema crece desde un esqueleto visual estático hasta convertirse en un nodo transaccional funcional con persistencia de datos relacional (SQLite) y validaciones de negocio complejas.
+El desarrollo se estructura en múltiples etapas incrementales. Cada carpeta contiene el código fuente de la iteración y su respectivo análisis técnico detallado en el archivo `descripcion.md`.
 
 ---
 
@@ -24,8 +24,9 @@ El desarrollo se divide en seis etapas incrementales. Cada carpeta contiene el c
 | **Iteración 4** | Integridad referencial cruzada entre CSVs, motor transaccional simulado y manejo de excepciones visuales. | [📖 Ver descripcion.md](./iteracion_04/docs/descripcion.md) |
 | **Iteración 5** | Migración definitiva a motor relacional (SQLite3), identificadores ocultos (IID), operaciones ACID y anclaje estricto de rutas. | [📖 Ver descripcion.md](./iteracion_05/docs/descripcion.md) |
 | **Iteración 6** | Ecosistema centralizado, Autenticación (Login), Seguridad RBAC, Consola SQL (Sandboxing) y Backups. | [📖 Ver descripcion.md](./iteracion_06/docs/descripcion.md) |
+| **Iteración 7** | Criptografía (Bcrypt), Entornos Virtuales (.venv), UX Global (DRY) y Filtros Relacionales. | [📖 Ver descripcion.md](./iteracion_07/docs/descripcion.md) |
 
-> 💡 **Nota sobre la Persistencia:** A partir de la Iteración 3, el sistema encapsula sus datos. Las iteraciones 3 y 4 generan y consumen archivos `.csv` alojados en una carpeta `/persistencia`. Las **Iteraciones 5 y 6** automatizan la creación de un directorio estricto `/db` donde compilan la base de datos relacional `frankie_gestor.db`. La **Iteración 6** suma además un directorio `/backups` autogestionado.
+> 💡 **Nota sobre la Persistencia y el Entorno:** A partir de la Iteración 3, el sistema encapsula sus datos de forma escalable. Las **Iteraciones 5, 6 y 7** automatizan la creación de un directorio estricto `/db` para la base de datos relacional `frankie_gestor.db` y un directorio `/backups` autogestionado. Desde la **Iteración 7**, el proyecto exige aislamiento mediante un entorno virtual (`.venv`) para manejar de forma segura sus dependencias criptográficas.
 
 ---
 
@@ -40,23 +41,32 @@ El enfoque principal de este proyecto es evidenciar el análisis crítico y la e
 * **Anclaje Dinámico de Directorios:** Uso de `os.path.dirname(os.path.abspath(__file__))` para garantizar que el sistema encuentre siempre la base de datos independientemente de la ruta desde la cual la consola de comandos haya ejecutado el script.
 * **Arquitectura de Seguridad (RBAC):** Implementación de un flujo de acceso cerrado. El sistema arranca desde un Login que inyecta los privilegios del usuario (Administrador, Gerente, Empleado) a un Panel de Control central, limitando dinámicamente la interfaz gráfica y bloqueando transacciones no autorizadas en el backend para prevenir ataques de escalada de privilegios.
 * **Sandboxing SQL y Auditoría:** Desarrollo de una consola de ejecución aislada con filtros de expresiones regulares (Regex) que bloquea sentencias destructivas (`DELETE`, `UPDATE`, `DROP`) e inyecta límites de paginación forzados para proteger la memoria, permitiendo realizar consultas de lectura en tiempo real de forma segura.
+* **Criptografía y Aislamiento de Entorno:** Erradicación de contraseñas en texto plano migrando al estándar empresarial Bcrypt (hashing con salt). Esto transformó el proyecto en un paquete de software formal, aislando sus dependencias en un entorno virtual (`.venv`) documentado en un manifiesto `requirements.txt`.
+* **Usabilidad Global (Principio DRY):** Implementación de Application-wide Binding (`bind_class`). En lugar de programar atajos de teclado (Copiar/Pegar) y menús contextuales widget por widget, se inyectaron a nivel de clase en el nodo raíz, propagando el comportamiento automáticamente a toda la interfaz sin duplicar código.
 
 ---
 
 ## 🚀 Ejecución y Entorno de Pruebas
 
-Para correr el sistema en su versión final y más estable, cloná el repositorio, abrí tu terminal y ejecutá el módulo de seguridad de la Iteración 6. Por convención arquitectónica, el archivo `login.py` actúa ahora como el nodo raíz (Parent) que orquesta la carga en memoria del `panel_control.py` y despliega los demás submódulos de forma perezosa (Lazy Import) según los permisos del usuario activo.
+Para correr el sistema en su versión actual más estable, cloná el repositorio y configurá el entorno virtual de la Iteración 7. El archivo `login.py` actúa como el nodo raíz (Parent) que orquesta la carga en memoria del `panel_control.py` y despliega los demás submódulos de forma asíncrona (Lazy Import) según los permisos del usuario activo.
 
 **Requisitos del Sistema:**
 * Python 3.x instalado.
-* Librerías nativas (`tkinter`, `sqlite3`, `csv`, `os`, `re`, `shutil`) habilitadas en el entorno. **No requiere base de datos externa ni instalaciones vía pip.**
+* Compilador C/C++ (requerido en Windows por la librería Bcrypt en algunas versiones de Python).
 
 **Instrucciones por Terminal:**
 ```bash
-# Navegar a la versión definitiva del sistema
-cd iteracion_06
+# Navegar a la versión actual del sistema
+cd iteracion_07
 
-# Ejecutar el nodo raíz de seguridad
+# Crear y activar el entorno virtual aislado (Ejemplo para Windows)
+python -m venv .venv
+.venv\Scripts\activate
+
+# Instalar las dependencias de seguridad
+pip install -r requirements.txt
+
+# Ejecutar el nodo raíz
 python login.py
 
 # Credenciales por defecto (Primer despliegue):

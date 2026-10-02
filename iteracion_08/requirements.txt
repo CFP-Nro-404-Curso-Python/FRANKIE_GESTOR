@@ -1,0 +1,8 @@
+# ==========================
+#  DEPENDENCIAS DEL SISTEMA
+# ==========================
+
+# Librería estándar de la industria para el hashing seguro de contraseñas.
+# Incorpora la generación de "sal" (salt) automática y ralentiza intencionalmente 
+# la validación para mitigar ataques de diccionario y fuerza bruta.
+bcrypt==4.2.0

@@ -359,4 +359,5 @@ class Proveedor(tk.Toplevel):
         # ========================
         #  CARGA INICIAL DE DATOS
         # ========================
+        
         cargar_datos_db()

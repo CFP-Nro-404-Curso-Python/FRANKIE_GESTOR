@@ -280,7 +280,8 @@ CREATE TABLE IF NOT EXISTS facturacion (
     -- COLUMNA GENERADA AUTOMÁTICAMENTE (Calculadora Integrada)
     -- Le pasammos la fórmula que  antes estaba en Python.
     -- 'GENERATED ALWAYS AS' le dice a SQLite que calcule este valor solo.
-    -- 'STORED' significa que el resultado se guarda físicamente en el disco para no gastar procesador recalculando cada vez que miramos la tabla.
+    -- 'STORED' significa que el resultado se guarda físicamente en el disco para no gastar procesador recalculando 
+    -- cada vez que miramos la tabla.
     total REAL GENERATED ALWAYS AS ((cantidad * valor) * (1 - (descuento / 100.0))) STORED,
 
     habilitado INTEGER DEFAULT 1,             -- Permite anular facturas (Baja Lógica).
@@ -288,6 +289,71 @@ CREATE TABLE IF NOT EXISTS facturacion (
     FOREIGN KEY (id_cliente) REFERENCES usuarios(id),
     FOREIGN KEY (id_producto) REFERENCES productos(id)
 );
+
+
+
+-- -----------------------------------------------------------------------------------------
+--  FASE 6: REGLAS DE NEGOCIO (TRIGGERS) Y VISTAS (VIEWS)
+--
+--  REFACTORIZACIÓN: Se agregan capas de seguridad a nivel base de datos y se preparan
+--  objetos virtuales (Vistas) para desacoplar la lógica de negocio de la interfaz gráfica,
+--  apuntando a un modelo MVC puro en futuras iteraciones.
+-- -----------------------------------------------------------------------------------------
+
+-- 1. TRIGGER DE SUPERVIVENCIA (Prevención de DoS Lógico)
+
+-- Este disparador intercepta cualquier UPDATE en la tabla usuarios. Si se intenta deshabilitar 
+-- (baja lógica) a un Administrador y es el último que queda activo, el motor de SQLite aborta 
+-- la transacción automáticamente, blindando el sistema contra errores de la aplicación o 
+-- acciones maliciosas.
+
+CREATE TRIGGER IF NOT EXISTS trg_proteger_ultimo_admin
+BEFORE UPDATE OF habilitado ON usuarios
+FOR EACH ROW
+WHEN NEW.habilitado = 0 AND OLD.habilitado = 1
+BEGIN
+    SELECT CASE
+        -- Verifica si el rol del usuario afectado es 'Administrador'.
+
+        WHEN (SELECT r.rol FROM usuxroles ur JOIN roles r ON ur.id_rol = r.id WHERE ur.id_usuario = OLD.id) = 'Administrador'
+        
+        -- Verifica si el conteo total de Administradores activos caerá a 0.
+
+        AND (SELECT COUNT(*) FROM usuarios u JOIN usuxroles ur ON u.id = ur.id_usuario JOIN roles r ON ur.id_rol = r.id WHERE r.rol = 'Administrador' AND u.habilitado = 1) <= 1
+        
+        -- Aborta y devuelve un mensaje de error nativo.
+
+        THEN RAISE(ABORT, 'Violación de Integridad: No se puede dar de baja al último Administrador del sistema.')
+    END;
+END;
+
+-- 2. VISTA (VIEW) DE EMPLEADOS: Desacoplamiento de Lógica de UI
+-- Empaqueta el JOIN masivo (12 tablas) necesario para reconstruir el perfil de un empleado. Esto permite que 
+-- el backend de Python simplemente ejecute "SELECT * FROM vista_empleados_activos", mejorando el rendimiento y 
+-- limpiando el código visual.
+
+CREATE VIEW IF NOT EXISTS vista_empleados_activos AS
+SELECT u.id, u.nombres, u.apellidos, u.dni, t.telefono, m.mail, d.direccion, c.ciudad, p.provincia, cp.cp, r.rol
+FROM usuarios u
+JOIN usuxroles ur ON u.id = ur.id_usuario
+JOIN roles r ON ur.id_rol = r.id
+LEFT JOIN usuarioxcontactos uc ON u.id = uc.id_usuario
+LEFT JOIN contactoxtelefonos ct ON uc.id = ct.id_contacto
+LEFT JOIN telefonos t ON ct.id_telefono = t.id
+LEFT JOIN contactoxmails cm ON uc.id = cm.id_contacto
+LEFT JOIN mails m ON cm.id_mail = m.id
+LEFT JOIN usuarioxubicaciones uu ON u.id = uu.id_usuario
+LEFT JOIN ubicacionxdireccion ud ON uu.id = ud.id_ubicacion
+LEFT JOIN direcciones d ON ud.id_direccion = d.id
+LEFT JOIN ubicacionxlocalidades ul ON uu.id = ul.id_ubicacion
+LEFT JOIN localidadxciudades lc ON ul.id = lc.id_localidad
+LEFT JOIN ciudades c ON lc.id_ciudad = c.id
+LEFT JOIN codigopostales cp ON lc.id_cp = cp.id
+LEFT JOIN localidadxprovincias lp ON ul.id = lp.id_localidad
+LEFT JOIN provincias p ON lp.id_provincia = p.id
+WHERE r.rol NOT IN ('Cliente', 'Proveedor') AND u.habilitado = 1;
+
+
 
 -- ======================================================================================= --
 --  FIN DEL ESQUEMA RELACIONAL                                                             --

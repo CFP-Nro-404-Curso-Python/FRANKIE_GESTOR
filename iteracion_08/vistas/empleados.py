@@ -56,6 +56,7 @@ class Empleado(tk.Toplevel):
             
             for fila in filas:
                 tabla.insert("", "end", iid=fila[0], values=fila[1:])
+
             conexion.close()
 
         def limpiar_campos():
@@ -128,6 +129,7 @@ class Empleado(tk.Toplevel):
                 cursor.execute("INSERT INTO localidadxprovincias (id_localidad, id_provincia) VALUES (?, ?)", (id_localidad, id_prov))
                 
                 conexion.commit()
+
             except sqlite3.Error as e:
                 messagebox.showerror("Error de Transacción", f"No se pudo guardar el empleado: {e}")
             finally:
@@ -190,6 +192,7 @@ class Empleado(tk.Toplevel):
                 # 2. Actualizamos Rol.
                 id_rol = obtener_o_crear_catalogo(cursor, "roles", "rol", rol)
                 cursor.execute("SELECT id FROM usuxroles WHERE id_usuario=?", (id_usuario,))
+
                 if cursor.fetchone():
                     cursor.execute("UPDATE usuxroles SET id_rol=? WHERE id_usuario=?", (id_rol, id_usuario))
                 else:
@@ -198,6 +201,7 @@ class Empleado(tk.Toplevel):
                 # 3. Actualización de Contactos.
                 cursor.execute("SELECT id FROM usuarioxcontactos WHERE id_usuario=?", (id_usuario,))
                 id_contacto = cursor.fetchone()
+
                 if id_contacto:
                     id_contacto = id_contacto[0]
                     id_tel_nuevo = obtener_o_crear_catalogo(cursor, "telefonos", "telefono", telefono)
@@ -218,6 +222,7 @@ class Empleado(tk.Toplevel):
                 # 4. Actualización de Ubicaciones.
                 cursor.execute("SELECT id FROM usuarioxubicaciones WHERE id_usuario=?", (id_usuario,))
                 id_ubicacion = cursor.fetchone()
+
                 if id_ubicacion:
                     id_ubicacion = id_ubicacion[0]
                     id_dir_nuevo = obtener_o_crear_catalogo(cursor, "direcciones", "direccion", domicilio)
@@ -225,6 +230,7 @@ class Empleado(tk.Toplevel):
                     
                     cursor.execute("SELECT id FROM ubicacionxlocalidades WHERE id_ubicacion=?", (id_ubicacion,))
                     id_localidad = cursor.fetchone()
+
                     if id_localidad:
                         id_localidad = id_localidad[0]
                         id_ciudad_nueva = obtener_o_crear_catalogo(cursor, "ciudades", "ciudad", ciudad)
@@ -252,6 +258,7 @@ class Empleado(tk.Toplevel):
                     cursor.execute("INSERT INTO localidadxprovincias (id_localidad, id_provincia) VALUES (?, ?)", (id_localidad, id_prov))
 
                 conexion.commit()
+
             except sqlite3.Error as e:
 
                 # Si se viola la integridad (ej. Modificar el último admin a empleado), el Trigger aborta la transacción.
@@ -275,7 +282,9 @@ class Empleado(tk.Toplevel):
                 for item in seleccion:
                     cursor.execute("UPDATE usuarios SET habilitado = 0 WHERE id = ?", (item,))
                     cursor.execute("UPDATE usuxroles SET habilitado = 0 WHERE id_usuario = ?", (item,))
+
                 conexion.commit()
+                
             except sqlite3.Error as e:
 
                 # El TRIGGER trg_proteger_ultimo_admin interceptará esto si se intenta borrar al último root.

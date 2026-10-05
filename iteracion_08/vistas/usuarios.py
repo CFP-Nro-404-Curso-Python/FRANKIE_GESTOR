@@ -35,6 +35,7 @@ class Usuario(tk.Toplevel):
         def obtener_id_rol(cursor, nombre_rol):
             cursor.execute("SELECT id FROM roles WHERE rol = ?", (nombre_rol,))
             resultado = cursor.fetchone()
+
             if resultado:
                 return resultado[0]
             else:
@@ -63,6 +64,7 @@ class Usuario(tk.Toplevel):
             
             for fila in filas:
                 tabla.insert("", "end", iid=fila[0], values=(fila[1], fila[2], fila[3], fila[4]))
+                
             conexion.close()
 
         def limpiar_campos():

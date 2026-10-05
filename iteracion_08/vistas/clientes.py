@@ -79,6 +79,7 @@ class Cliente(tk.Toplevel):
             
             for fila in filas:
                 tabla.insert("", "end", iid=fila[0], values=fila[1:])
+
             conexion.close()
 
         def limpiar_campos():
@@ -148,6 +149,7 @@ class Cliente(tk.Toplevel):
                 cursor.execute("INSERT INTO localidadxprovincias (id_localidad, id_provincia) VALUES (?, ?)", (id_localidad, id_prov))
                 
                 conexion.commit()
+
             except sqlite3.Error as e:
                 messagebox.showerror("Error de Transacción", f"No se pudo guardar el cliente: {e}")
             finally:
@@ -205,6 +207,7 @@ class Cliente(tk.Toplevel):
                 # 2. Actualización de Contactos (Rastreando el ID de contacto).
                 cursor.execute("SELECT id FROM usuarioxcontactos WHERE id_usuario=?", (id_usuario,))
                 id_contacto = cursor.fetchone()
+
                 if id_contacto:
                     id_contacto = id_contacto[0]
                     id_tel_nuevo = obtener_o_crear_catalogo(cursor, "telefonos", "telefono", telefono)
@@ -216,6 +219,7 @@ class Cliente(tk.Toplevel):
                 # 3. Actualización de Ubicaciones (Rastreando el ID de ubicación y localidad).
                 cursor.execute("SELECT id FROM usuarioxubicaciones WHERE id_usuario=?", (id_usuario,))
                 id_ubicacion = cursor.fetchone()
+
                 if id_ubicacion:
                     id_ubicacion = id_ubicacion[0]
                     id_dir_nuevo = obtener_o_crear_catalogo(cursor, "direcciones", "direccion", domicilio)
@@ -223,6 +227,7 @@ class Cliente(tk.Toplevel):
                     
                     cursor.execute("SELECT id FROM ubicacionxlocalidades WHERE id_ubicacion=?", (id_ubicacion,))
                     id_localidad = cursor.fetchone()
+
                     if id_localidad:
                         id_localidad = id_localidad[0]
                         id_ciudad_nueva = obtener_o_crear_catalogo(cursor, "ciudades", "ciudad", ciudad)
@@ -233,6 +238,7 @@ class Cliente(tk.Toplevel):
                         cursor.execute("UPDATE localidadxprovincias SET id_provincia=? WHERE id_localidad=?", (id_prov_nueva, id_localidad))
                 
                 conexion.commit()
+
             except sqlite3.Error as e:
                 messagebox.showerror("Error de Actualización", f"No se pudo modificar el cliente: {e}")
             finally:
@@ -254,7 +260,9 @@ class Cliente(tk.Toplevel):
                 for item in seleccion:
                     cursor.execute("UPDATE usuarios SET habilitado = 0 WHERE id = ?", (item,))
                     cursor.execute("UPDATE usuxroles SET habilitado = 0 WHERE id_usuario = ?", (item,))
+
                 conexion.commit()
+                
             except sqlite3.Error as e:
                 messagebox.showerror("Error", f"No se pudo dar de baja al cliente: {e}")
             finally:

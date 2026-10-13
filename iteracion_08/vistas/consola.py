@@ -16,11 +16,12 @@ class ConsolaSQL(tk.Toplevel):
         
 
 
-        # =======================================================================
-        #  ANCLAJE DE DIRECTORIO Y BASE DE DATOS (REFACTORIZACIÓN DE ESTRUCTURA)
-        # =======================================================================
+        # ======================================================
+        #  ANCLAJE DE DIRECTORIOS (ADAPTADO A NUEVA ESTRUCTURA)
+        # ======================================================
 
-        # CAMBIO: Adaptación de la ruta a la nueva estructura de carpetas (vistas -> raíz -> db).
+        # CAMBIO: consola.py ahora está dentro de /vistas, por lo que debemos subir 
+        # un nivel en el árbol de directorios para encontrar la carpeta /db.
         DIRECTORIO_VISTAS = os.path.dirname(os.path.abspath(__file__))
         DIRECTORIO_RAIZ = os.path.dirname(DIRECTORIO_VISTAS)
         DB_PATH = os.path.join(DIRECTORIO_RAIZ, "db", "frankie_gestor.db")
@@ -40,11 +41,8 @@ class ConsolaSQL(tk.Toplevel):
                 return
 
             # 1. Filtro Restrictivo de Solo Lectura.
-            
-            # CAMBIO: Refuerzo de la seguridad en la expresión regular (Regex). Se añadieron comandos 
-            # administrativos nativos de SQLite (PRAGMA, ATTACH, DETACH, VACUUM) para evitar que un usuario 
-            # intente corromper el archivo físico, modificar configuraciones internas o adjuntar bases externas.
-            patron_prohibido = r'\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE|PRAGMA|ATTACH|DETACH|VACUUM)\b'
+            # Usamos Regex para buscar palabras reservadas destructivas con límites de palabra (\b).
+            patron_prohibido = r'\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE)\b'
             
             if re.search(patron_prohibido, query_cruda, re.IGNORECASE):
                 messagebox.showerror("Bloqueo de Seguridad", "Transacción abortada. Operación destructiva detectada.\nEsta consola es de Solo Lectura (SELECT).")
@@ -76,6 +74,7 @@ class ConsolaSQL(tk.Toplevel):
                 label_estado.config(text=f"Error SQL: {e}", fg="red")
 
         def renderizar_grilla(columnas, filas):
+            
             # Limpiamos los datos y la estructura anterior.
             tabla.delete(*tabla.get_children())
             tabla["columns"] = columnas

@@ -7,7 +7,8 @@ import bcrypt
 
 
 class Usuario(tk.Toplevel):
-    def __init__(self, parent, rol_actual):
+    # CAMBIO: Recibimos id_actual desde panel_control.py para auditoría de auto-modificación.
+    def __init__(self, parent, id_actual, rol_actual):
         super().__init__(parent)
         
         self.title("GESTIÓN DE USUARIOS")
@@ -15,11 +16,11 @@ class Usuario(tk.Toplevel):
         
 
 
-        # =======================================================================
-        #  ANCLAJE DE DIRECTORIO Y BASE DE DATOS (REFACTORIZACIÓN DE ESTRUCTURA)
-        # =======================================================================
+        # ======================================================
+        #  ANCLAJE DE DIRECTORIOS (ADAPTADO A NUEVA ESTRUCTURA)
+        # ======================================================
 
-        # CAMBIO: Adaptación a la nueva estructura de carpetas (vistas -> raíz -> db).
+        # CAMBIO: usuarios.py ahora reside en /vistas. Subimos un nivel para anclar en /db.
         DIRECTORIO_VISTAS = os.path.dirname(os.path.abspath(__file__))
         DIRECTORIO_RAIZ = os.path.dirname(DIRECTORIO_VISTAS)
         DB_PATH = os.path.join(DIRECTORIO_RAIZ, "db", "frankie_gestor.db")
@@ -30,19 +31,6 @@ class Usuario(tk.Toplevel):
         #  FUNCIONALIDADES DE BASE DE DATOS
         # ==================================
 
-        # CAMBIO: Función Helper. Como el modelo de datos ahora está normalizado, necesitamos convertir el texto 
-        # del rol que elige el usuario en el ComboBox al ID numérico que corresponde en la tabla 'roles'.
-        def obtener_id_rol(cursor, nombre_rol):
-            cursor.execute("SELECT id FROM roles WHERE rol = ?", (nombre_rol,))
-            resultado = cursor.fetchone()
-
-            if resultado:
-                return resultado[0]
-            else:
-                # Si el rol no existe en el catálogo, lo insertamos dinámicamente y retornamos el nuevo ID.
-                cursor.execute("INSERT INTO roles (rol) VALUES (?)", (nombre_rol,))
-                return cursor.lastrowid
-
         def cargar_datos_db():
             for item in tabla.get_children():
                 tabla.delete(item)
@@ -50,21 +38,22 @@ class Usuario(tk.Toplevel):
             conexion = sqlite3.connect(DB_PATH)
             cursor = conexion.cursor()
             
-            # CAMBIO: La columna 'rol' ya no existe en la tabla usuarios.
-            # Se requiere un JOIN con la tabla puente 'usuxroles' y el catálogo 'roles'.
-            # Además, filtramos por 'habilitado = 1' para ocultar los usuarios dados de baja lógica.
+            # CAMBIO: Para mostrar los usuarios en la grilla sin perder información vital (como el nombre de usuario de login),
+            # y dado que un empleado puede ser creado en 'empleados.py' sin usuario/password, usamos un LEFT JOIN
+            # para traer a TODOS los empleados/gerentes/admins, tengan o no credenciales, y reemplazamos los NULL por un aviso visual.
             cursor.execute('''
-                SELECT u.id, u.usuario, r.rol, u.nombres, u.apellidos 
+                SELECT u.id, 
+                       IFNULL(u.usuario, '[Sin Credenciales]') as usuario, 
+                       r.rol, u.nombres, u.apellidos 
                 FROM usuarios u
                 JOIN usuxroles ur ON u.id = ur.id_usuario
                 JOIN roles r ON ur.id_rol = r.id
-                WHERE u.habilitado = 1 AND ur.habilitado = 1
+                WHERE u.habilitado = 1 AND ur.habilitado = 1 AND r.rol NOT IN ('Cliente', 'Proveedor')
             ''')
             filas = cursor.fetchall()
             
             for fila in filas:
                 tabla.insert("", "end", iid=fila[0], values=(fila[1], fila[2], fila[3], fila[4]))
-                
             conexion.close()
 
         def limpiar_campos():
@@ -82,15 +71,19 @@ class Usuario(tk.Toplevel):
             password = caja_password.get().strip()
             rol = caja_rol.get()
 
+            # CAMBIO: La validación ahora asume que si alguien crea un usuario desde acá,
+            # DEBE tener credenciales. Si lo crea desde empleados.py, no las tendrá.
             if not nombres or not apellidos or not usuario or not password or not rol:
-                messagebox.showwarning("Validación", "Todos los campos son obligatorios.")
+                messagebox.showwarning("Validación", "Todos los campos son obligatorios en este módulo.")
                 return
-
+    
+            # BARRERA RBAC FRONT-TO-BACK: Bloquea la creación de roles superiores.
+            # Un Gerente NUNCA puede crear otro Gerente ni a un Administrador.
             if rol_actual == "Gerente" and rol in ["Administrador", "Gerente"]:
                 messagebox.showerror("Acceso Denegado", "Privilegios insuficientes para crear perfiles de esta jerarquía.")
                 limpiar_campos()
                 return
-
+            
             password_bytes = password.encode('utf-8')
             sal = bcrypt.gensalt()
             password_hash = bcrypt.hashpw(password_bytes, sal).decode('utf-8')
@@ -99,17 +92,19 @@ class Usuario(tk.Toplevel):
                 conexion = sqlite3.connect(DB_PATH)
                 cursor = conexion.cursor()
                 
-                # CAMBIO: Transacción en 2 pasos para respetar la Normalización Extrema.
-                # 1. Insertamos al usuario en la tabla central (sin rol).
+                # CAMBIO: Transacción escalonada (Normalización)
+                # 1. Recuperamos el ID numérico del rol seleccionado desde el catálogo.
+                cursor.execute("SELECT id FROM roles WHERE rol=?", (rol,))
+                id_rol = cursor.fetchone()[0]
+
+                # 2. Insertamos al usuario en la tabla central y rescatamos su nuevo ID.
                 cursor.execute('''
                     INSERT INTO usuarios (usuario, password, nombres, apellidos)
                     VALUES (?, ?, ?, ?)
                 ''', (usuario, password_hash, nombres, apellidos))
-                
                 id_nuevo_usuario = cursor.lastrowid
                 
-                # 2. Obtenemos el ID del rol y lo vinculamos en la tabla puente (usuxroles).
-                id_rol = obtener_id_rol(cursor, rol)
+                # 3. Vinculamos al usuario con su rol en la tabla asociativa (N:M).
                 cursor.execute('''
                     INSERT INTO usuxroles (id_usuario, id_rol)
                     VALUES (?, ?)
@@ -160,23 +155,32 @@ class Usuario(tk.Toplevel):
             conexion = sqlite3.connect(DB_PATH)
             cursor = conexion.cursor()
 
-            # CAMBIO: Barrera RBAC actualizada al nuevo modelo con JOINs.
+            # CAMBIO: Extracción de rol objetivo mediante JOIN para validar permisos RBAC.
             cursor.execute('''
-                SELECT r.rol 
-                FROM usuarios u
+                SELECT r.rol FROM usuarios u
                 JOIN usuxroles ur ON u.id = ur.id_usuario
                 JOIN roles r ON ur.id_rol = r.id
-                WHERE u.id = ? AND u.habilitado = 1
+                WHERE u.id=? AND ur.habilitado=1
             ''', (id_usuario,))
-            rol_target = cursor.fetchone()[0]
+            resultado_rol_target = cursor.fetchone()
             
-            if rol_actual == "Gerente" and rol_target in ["Administrador", "Gerente"]:
-                messagebox.showerror("Acceso Denegado", "Privilegios insuficientes para modificar a este usuario.")
+            if not resultado_rol_target:
                 conexion.close()
                 return
+                
+            rol_target = resultado_rol_target[0]
+            
+            # CAMBIO: Barrera RBAC corregida. 
+            # Si es Gerente, no puede modificar a un Admin ni a otro Gerente, 
+            # EXCEPTO si el ID seleccionado coincide con su propio ID (Auto-modificación).
+            if rol_actual == "Gerente":
+                if rol_target == "Administrador" or (rol_target == "Gerente" and int(id_usuario) != id_actual):
+                    messagebox.showerror("Acceso Denegado", "Privilegios insuficientes para modificar a este usuario.")
+                    conexion.close()
+                    return
             
             try:
-                # CAMBIO: Actualizamos la tabla central (usuarios).
+                # 1. Modificación de datos personales y credenciales (Tabla Central).
                 if password:
                     password_bytes = password.encode('utf-8')
                     sal = bcrypt.gensalt()
@@ -192,11 +196,11 @@ class Usuario(tk.Toplevel):
                                       WHERE id=?''', 
                                    (usuario, nombres, apellidos, id_usuario))
                 
-                # CAMBIO: Actualizamos la tabla puente (usuxroles).
-                id_rol = obtener_id_rol(cursor, rol)
-                cursor.execute('''
-                    UPDATE usuxroles SET id_rol = ? WHERE id_usuario = ?
-                ''', (id_rol, id_usuario))
+                # 2. Modificación del Rol (Tabla Intermedia).
+                cursor.execute("SELECT id FROM roles WHERE rol=?", (rol,))
+                id_rol_nuevo = cursor.fetchone()[0]
+                
+                cursor.execute('''UPDATE usuxroles SET id_rol=? WHERE id_usuario=? AND habilitado=1''', (id_rol_nuevo, id_usuario))
                 
                 conexion.commit()
             except sqlite3.IntegrityError:
@@ -217,47 +221,38 @@ class Usuario(tk.Toplevel):
             conexion = sqlite3.connect(DB_PATH)
             cursor = conexion.cursor()
             
-            # CAMBIO: Obtenemos el rol mediante JOIN para la validación de seguridad.
+            # Extraemos el rol del usuario a eliminar mediante JOIN.
             cursor.execute('''
                 SELECT r.rol FROM usuarios u
                 JOIN usuxroles ur ON u.id = ur.id_usuario
                 JOIN roles r ON ur.id_rol = r.id
-                WHERE u.id = ?
+                WHERE u.id=? AND ur.habilitado=1
             ''', (id_usuario,))
             rol_a_borrar = cursor.fetchone()[0]
 
+            # CAMBIO: Barrera RBAC corregida.
+            # Un Gerente no puede borrar a un Administrador, a otro Gerente, NI A SÍ MISMO.
+            # El borrado propio solo lo puede ejecutar un Administrador (despido/baja corporativa).
             if rol_actual == "Gerente" and rol_a_borrar in ["Administrador", "Gerente"]:
-                messagebox.showerror("Acceso Denegado", "Privilegios insuficientes para eliminar a este usuario.")
+                if int(id_usuario) == id_actual:
+                     messagebox.showerror("Acceso Denegado", "Por políticas de seguridad, no podés darte de baja a vos mismo. Contactá a un Administrador.")
+                else:
+                     messagebox.showerror("Acceso Denegado", "Privilegios insuficientes para eliminar a este usuario.")
                 conexion.close()
                 return
-
-            if rol_a_borrar == "Administrador":
-                cursor.execute('''
-                    SELECT COUNT(*) FROM usuarios u 
-                    JOIN usuxroles ur ON u.id = ur.id_usuario 
-                    JOIN roles r ON ur.id_rol = r.id 
-                    WHERE r.rol = 'Administrador' AND u.habilitado = 1
-                ''')
-                total_admins = cursor.fetchone()[0]
-                if total_admins <= 1:
-                    messagebox.showerror("Operación Bloqueada", "No podés dar de baja al único Administrador del sistema.")
-                    conexion.close()
-                    return
-
-            # ===============================================
-            #  CAMBIO CRÍTICO: IMPLEMENTACIÓN DE BAJA LÓGICA
-            # ===============================================
-
-            # Se eliminaron los comandos DELETE FROM para respetar la política de no destrucción de datos de la cátedra. 
-            # Ahora se setea habilitado = 0 tanto en el registro matriz como en sus relaciones directas.
             
             try:
-                # Si esto falla, el Trigger 'trg_proteger_ultimo_admin' en DB abortará.
-                cursor.execute("UPDATE usuarios SET habilitado = 0 WHERE id = ?", (id_usuario,))
-                cursor.execute("UPDATE usuxroles SET habilitado = 0 WHERE id_usuario = ?", (id_usuario,))
+                # CAMBIO: Cumplimiento de requerimiento de Cátedra (Borrado Lógico).
+                # En lugar de DELETE, aplicamos un UPDATE en ambas tablas para ocultar el registro.
+                # Si se intenta deshabilitar al último Admin, el trigger de SQLite lanzará una 
+                # excepción que será capturada por el bloque except.
+                cursor.execute("UPDATE usuarios SET habilitado=0 WHERE id=?", (id_usuario,))
+                cursor.execute("UPDATE usuxroles SET habilitado=0 WHERE id_usuario=?", (id_usuario,))
                 conexion.commit()
-            except sqlite3.Error as e:
-                messagebox.showerror("Error de Base de Datos", f"Transacción abortada: {e}")
+            except sqlite3.Error as error_db:
+                
+                # Capturamos el RAISE(ABORT) emitido por el trigger de la base de datos (trg_proteger_ultimo_admin).
+                messagebox.showerror("Operación Bloqueada por Motor DB", str(error_db))
             finally:
                 conexion.close()
             
@@ -291,6 +286,7 @@ class Usuario(tk.Toplevel):
 
         tk.Label(frame_form, text="Rol Asignado:").grid(row=4, column=0, padx=10, pady=5, sticky="e")
         
+        # Filtro de seguridad visual basado en rol.
         roles_permitidos = ["Empleado - Ventas", "Empleado - Compras"]
         if rol_actual == "Administrador":
             roles_permitidos = ["Administrador", "Gerente"] + roles_permitidos
@@ -305,6 +301,7 @@ class Usuario(tk.Toplevel):
         tk.Button(frame_botones, text="Modificar", command=modificar, bg="#2196F3", fg="white", width=12).grid(row=0, column=1, padx=5)
         tk.Button(frame_botones, text="Eliminar", command=eliminar, bg="#F44336", fg="white", width=12).grid(row=0, column=2, padx=5)
 
+        # Grilla de Usuarios.
         columnas = ("Usuario", "Rol", "Nombres", "Apellidos")
         tabla = ttk.Treeview(self, columns=columnas, show="headings", height=8)
         tabla.heading("Usuario", text="Usuario")

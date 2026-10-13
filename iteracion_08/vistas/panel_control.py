@@ -7,14 +7,19 @@ from datetime import datetime
 
 
 class PanelControl(tk.Toplevel):
-    def __init__(self, parent, rol_usuario, nombres_usuario, apellidos_usuario):
+
+    # El constructor ahora exige id_usuario para solucionar la amnesia de identidad.
+    def __init__(self, parent, id_usuario, rol_usuario, nombres_usuario, apellidos_usuario):
         super().__init__(parent)
         
         self.title(f"PANEL DE CONTROL - {rol_usuario.upper()}")
         self.geometry("750x550")
         self.resizable(False, False)
+
+        # Aplicamos un color de fondo neutro para resaltar los botones.
         self.configure(bg="#f0f2f5")
 
+        # Al cerrar esta ventana con la "X", cerramos toda la aplicación (mata el root).
         self.protocol("WM_DELETE_WINDOW", parent.destroy)
 
 
@@ -23,16 +28,15 @@ class PanelControl(tk.Toplevel):
         #  RUTINAS DE NAVEGACIÓN (LAZY IMPORTS)
         # ======================================
 
-        # Al estar todos los archivos .py centralizados en la carpeta "vistas", las importaciones locales siguen 
-        # funcionando sin necesidad de modificar rutas.
-
         def abrir_clientes():
             from clientes import Cliente
             Cliente(self)
 
         def abrir_empleados():
             from empleados import Empleado
-            Empleado(self)
+
+            # CAMBIO: Propagamos la identidad y jerarquía completas al ABM de Recursos Humanos.
+            Empleado(self, id_usuario, rol_usuario)
 
         def abrir_proveedores():
             from proveedores import Proveedor
@@ -48,7 +52,9 @@ class PanelControl(tk.Toplevel):
             
         def abrir_usuarios():
             from usuarios import Usuario
-            Usuario(self, rol_usuario)
+            
+            # CAMBIO: Propagamos la identidad física al ABM de Usuarios para auditoría interna.
+            Usuario(self, id_usuario, rol_usuario)
             
         def abrir_consola():
             from consola import ConsolaSQL
@@ -56,29 +62,22 @@ class PanelControl(tk.Toplevel):
             
         def generar_backup():
             try:
-
-
-
-                # =====================================================================
-                #  CAMBIO: REFACTORIZACIÓN DE RUTAS POR NUEVA ARQUITECTURA DE CARPETAS
-                # =====================================================================
-
-                # Como panel_control.py ahora vive en la subcarpeta "vistas", tenemos que retroceder 
-                # un nivel (al directorio raíz) para ubicar las carpetas "db" y "backups".
+                # CAMBIO: Adaptación de rutas a la nueva estructura de directorios.
+                # panel_control.py ahora vive en /vistas, por lo que debemos subir 
+                # un nivel para acceder a las carpetas /db y /backups.
                 directorio_vistas = os.path.dirname(os.path.abspath(__file__))
                 directorio_raiz = os.path.dirname(directorio_vistas)
-                
-                # Apuntamos a la base de datos real en la nueva carpeta /db.
                 ruta_db = os.path.join(directorio_raiz, "db", "frankie_gestor.db")
                 
                 if not os.path.exists(ruta_db):
                     messagebox.showerror("Error", "No se encontró la base de datos para respaldar.")
                     return
                 
-                # Apuntamos la creación de la copia de seguridad a la nueva carpeta /backups.
+                # Creamos la carpeta de backups en la raíz del proyecto si no existe.
                 carpeta_backup = os.path.join(directorio_raiz, "backups")
                 os.makedirs(carpeta_backup, exist_ok=True)
                 
+                # Generamos un nombre de archivo con marca de tiempo.
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 nombre_backup = f"backup_frankie_{timestamp}.db"
                 ruta_destino = os.path.join(carpeta_backup, nombre_backup)
@@ -90,7 +89,7 @@ class PanelControl(tk.Toplevel):
 
         def cerrar_sesion():
             self.destroy()
-            parent.deiconify() 
+            parent.deiconify() # Vuelve a mostrar el login original.
 
 
 
@@ -98,8 +97,7 @@ class PanelControl(tk.Toplevel):
         #  MATRIZ DE PERMISOS (RBAC)
         # ===========================
 
-        # La seguridad frontal se mantiene intacta. Los roles de esquema.sql coinciden perfectamente con esta matriz, 
-        # bloqueando la UI según la jerarquía del usuario.
+        # Definimos qué roles tienen acceso normal a cada módulo. Si el rol no está en la lista, queda DISABLED.
         p_clientes = tk.NORMAL if rol_usuario in ["Administrador", "Gerente", "Empleado - Ventas"] else tk.DISABLED
         p_facturacion = tk.NORMAL if rol_usuario in ["Administrador", "Gerente", "Empleado - Ventas"] else tk.DISABLED
         
@@ -117,29 +115,32 @@ class PanelControl(tk.Toplevel):
         #  INTERFAZ GRÁFICA Y ESTILOS
         # ============================
 
+        # Inyección visual de los datos personales del usuario activo usando f-strings.
         tk.Label(self, text=f"BIENVENIDO/A, {nombres_usuario.upper()} {apellidos_usuario.upper()}", font=("Arial", 16, "bold"), bg="#f0f2f5", fg="#333333").pack(pady=(20, 5))
         tk.Label(self, text=f"Rol Activo: {rol_usuario}", font=("Arial", 11, "italic"), bg="#f0f2f5", fg="#666666").pack(pady=(0, 20))
 
+        # Contenedor para la grilla de botones.
         frame_botones = tk.Frame(self, bg="#f0f2f5")
         frame_botones.pack(expand=True)
 
+        # Configuración visual de botones estándar (Azul corporativo).
         estilo_btn = {"font": ("Arial", 11, "bold"), "bg": "#2196F3", "fg": "white", "width": 20, "height": 2}
         
-        # Fila 1: Ventas.
+        # Fila 1: Operaciones de Ventas.
         tk.Button(frame_botones, text="Gestión de Clientes", command=abrir_clientes, state=p_clientes, **estilo_btn).grid(row=0, column=0, padx=15, pady=15)
         tk.Button(frame_botones, text="Facturación", command=abrir_facturacion, state=p_facturacion, **estilo_btn).grid(row=0, column=1, padx=15, pady=15)
 
-        # Fila 2: Compras.
+        # Fila 2: Operaciones de Compras.
         tk.Button(frame_botones, text="Gestión de Proveedores", command=abrir_proveedores, state=p_proveedores, **estilo_btn).grid(row=1, column=0, padx=15, pady=15)
         tk.Button(frame_botones, text="Control de Stock", command=abrir_stock, state=p_stock, **estilo_btn).grid(row=1, column=1, padx=15, pady=15)
 
-        # Fila 3: Recursos Humanos y Accesos.
+        # Fila 3: Recursos Humanos y Accesos (Tonos anaranjados/violetas para diferenciar).
         tk.Button(frame_botones, text="Recursos Humanos", command=abrir_empleados, state=p_empleados, font=("Arial", 11, "bold"), bg="#FF9800", fg="white", width=20, height=2).grid(row=2, column=0, padx=15, pady=15)
         tk.Button(frame_botones, text="Gestión de Usuarios", command=abrir_usuarios, state=p_usuarios, font=("Arial", 11, "bold"), bg="#9C27B0", fg="white", width=20, height=2).grid(row=2, column=1, padx=15, pady=15)
 
-        # Fila 4: ROOT y Sistemas.
+        # Fila 4: Herramientas ROOT (Tonos oscuros/grises).
         tk.Button(frame_botones, text="Consola SQL (Auditoría)", command=abrir_consola, state=p_root, font=("Arial", 11, "bold"), bg="#607D8B", fg="white", width=20, height=2).grid(row=3, column=0, padx=15, pady=15)
         tk.Button(frame_botones, text="Generar Backup DB", command=generar_backup, state=p_root, font=("Arial", 11, "bold"), bg="#37474F", fg="white", width=20, height=2).grid(row=3, column=1, padx=15, pady=15)
 
-        # Botón de Cerrar Sesión.
+        # Botón de Cerrar Sesión (Rojo).
         tk.Button(self, text="Cerrar Sesión", command=cerrar_sesion, font=("Arial", 10, "bold"), bg="#F44336", fg="white", width=15).pack(pady=20)

@@ -328,30 +328,61 @@ BEGIN
 END;
 
 -- 2. VISTA (VIEW) DE EMPLEADOS: Desacoplamiento de Lógica de UI
--- Empaqueta el JOIN masivo (12 tablas) necesario para reconstruir el perfil de un empleado. Esto permite que 
--- el backend de Python simplemente ejecute "SELECT * FROM vista_empleados_activos", mejorando el rendimiento y 
--- limpiando el código visual.
+-- CAMBIO CRÍTICO: Se inyecta la validación 'habilitado = 1' en TODOS los JOINs para evitar
+-- filas duplicadas por historial de modificaciones, y se hace un DROP previo para forzar a SQLite
+-- a aplicar estos cambios sobre la base de datos existente.
 
-CREATE VIEW IF NOT EXISTS vista_empleados_activos AS
+DROP VIEW IF EXISTS vista_empleados_activos;
+
+CREATE VIEW vista_empleados_activos AS
 SELECT u.id, u.nombres, u.apellidos, u.dni, t.telefono, m.mail, d.direccion, c.ciudad, p.provincia, cp.cp, r.rol
 FROM usuarios u
-JOIN usuxroles ur ON u.id = ur.id_usuario
-JOIN roles r ON ur.id_rol = r.id
-LEFT JOIN usuarioxcontactos uc ON u.id = uc.id_usuario
-LEFT JOIN contactoxtelefonos ct ON uc.id = ct.id_contacto
-LEFT JOIN telefonos t ON ct.id_telefono = t.id
-LEFT JOIN contactoxmails cm ON uc.id = cm.id_contacto
-LEFT JOIN mails m ON cm.id_mail = m.id
-LEFT JOIN usuarioxubicaciones uu ON u.id = uu.id_usuario
-LEFT JOIN ubicacionxdireccion ud ON uu.id = ud.id_ubicacion
-LEFT JOIN direcciones d ON ud.id_direccion = d.id
-LEFT JOIN ubicacionxlocalidades ul ON uu.id = ul.id_ubicacion
-LEFT JOIN localidadxciudades lc ON ul.id = lc.id_localidad
-LEFT JOIN ciudades c ON lc.id_ciudad = c.id
-LEFT JOIN codigopostales cp ON lc.id_cp = cp.id
-LEFT JOIN localidadxprovincias lp ON ul.id = lp.id_localidad
-LEFT JOIN provincias p ON lp.id_provincia = p.id
+JOIN usuxroles ur ON u.id = ur.id_usuario AND ur.habilitado = 1
+JOIN roles r ON ur.id_rol = r.id AND r.habilitado = 1
+LEFT JOIN usuarioxcontactos uc ON u.id = uc.id_usuario AND uc.habilitado = 1
+LEFT JOIN contactoxtelefonos ct ON uc.id = ct.id_contacto AND ct.habilitado = 1
+LEFT JOIN telefonos t ON ct.id_telefono = t.id AND t.habilitado = 1
+LEFT JOIN contactoxmails cm ON uc.id = cm.id_contacto AND cm.habilitado = 1
+LEFT JOIN mails m ON cm.id_mail = m.id AND m.habilitado = 1
+LEFT JOIN usuarioxubicaciones uu ON u.id = uu.id_usuario AND uu.habilitado = 1
+LEFT JOIN ubicacionxdireccion ud ON uu.id = ud.id_ubicacion AND ud.habilitado = 1
+LEFT JOIN direcciones d ON ud.id_direccion = d.id AND d.habilitado = 1
+LEFT JOIN ubicacionxlocalidades ul ON uu.id = ul.id_ubicacion AND ul.habilitado = 1
+LEFT JOIN localidadxciudades lc ON ul.id = lc.id_localidad AND lc.habilitado = 1
+LEFT JOIN ciudades c ON lc.id_ciudad = c.id AND c.habilitado = 1
+LEFT JOIN codigopostales cp ON lc.id_cp = cp.id AND cp.habilitado = 1
+LEFT JOIN localidadxprovincias lp ON ul.id = lp.id_localidad AND lp.habilitado = 1
+LEFT JOIN provincias p ON lp.id_provincia = p.id AND p.habilitado = 1
 WHERE r.rol NOT IN ('Cliente', 'Proveedor') AND u.habilitado = 1;
+
+-- 3. TRIGGERS DE BLOQUEO DE BORRADO FÍSICO (HARD DELETE LOCK)
+-- Estos disparadores interceptan cualquier instrucción DELETE en tablas críticas.
+-- Garantizan que ni un error de backend ni una inyección SQL puedan destruir datos físicos, forzando a todo el 
+-- ecosistema a usar obligatoriamente UPDATE habilitado = 0.
+
+CREATE TRIGGER IF NOT EXISTS trg_bloquear_delete_usuarios
+BEFORE DELETE ON usuarios
+BEGIN
+    SELECT RAISE(ABORT, 'Violación de Seguridad Nivel 1: Prohibido eliminar usuarios físicamente. Utilice la baja lógica (habilitado = 0).');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_bloquear_delete_facturacion
+BEFORE DELETE ON facturacion
+BEGIN
+    SELECT RAISE(ABORT, 'Violación de Auditoría: Prohibido eliminar comprobantes de facturación históricos.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_bloquear_delete_productos
+BEFORE DELETE ON productos
+BEGIN
+    SELECT RAISE(ABORT, 'Violación de Integridad: Prohibido eliminar productos del catálogo. Utilice la baja lógica.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_bloquear_delete_roles
+BEFORE DELETE ON roles
+BEGIN
+    SELECT RAISE(ABORT, 'Violación de Arquitectura: Prohibido eliminar roles del sistema.');
+END;
 
 
 

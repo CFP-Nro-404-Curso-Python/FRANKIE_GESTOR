@@ -10,36 +10,45 @@ class Proveedor(tk.Toplevel):
         super().__init__(parent)
 
         self.title("FORMULARIO PROVEEDORES")
-        self.geometry("1005x550")
+        self.geometry("925x550")
 
 
 
-        # =======================================
-        #  ANCLAJE DE DIRECTORIO Y BASE DE DATOS
-        # =======================================
+        # ======================================================
+        #  ANCLAJE DE DIRECTORIOS (ADAPTADO A NUEVA ESTRUCTURA)
+        # ======================================================
 
-        # CAMBIO: Adaptación de la ruta a la nueva estructura de carpetas (vistas -> raíz -> db).
         DIRECTORIO_VISTAS = os.path.dirname(os.path.abspath(__file__))
         DIRECTORIO_RAIZ = os.path.dirname(DIRECTORIO_VISTAS)
         DB_PATH = os.path.join(DIRECTORIO_RAIZ, "db", "frankie_gestor.db")
 
 
 
+        # =====================================================
+        #  MÓDULO DE NORMALIZACIÓN EXTREMA (HELPERS DE FASE 1)
+        # =====================================================
+        
+        # Esta función busca si el texto ya existe en el catálogo para evitar redundancia.
+        # Si existe, retorna su ID. Si no, lo inserta y retorna el nuevo ID.
+        def obtener_o_crear(cursor, tabla, columna, valor):
+            valor_limpio = str(valor).strip() if valor else "S/D"
+            if not valor_limpio:
+                valor_limpio = "S/D"
+                
+            cursor.execute(f"SELECT id FROM {tabla} WHERE {columna}=?", (valor_limpio,))
+            resultado = cursor.fetchone()
+            
+            if resultado:
+                return resultado[0]
+            
+            cursor.execute(f"INSERT INTO {tabla} ({columna}) VALUES (?)", (valor_limpio,))
+            return cursor.lastrowid
+
+
+
         # =============================================
         #  FUNCIONALIDADES DE "FORMULARIO PROVEEDORES"
         # =============================================
-
-        # CAMBIO: Se eliminó la función "crear_tabla_proveedores". La base de datos 
-        # está centralizada y se construye íntegramente mediante el archivo 'esquema.sql'.
-
-        # CAMBIO HELPER: Función auxiliar para evitar registros duplicados en los catálogos.
-        def obtener_o_crear_catalogo(cursor, tabla, columna, valor):
-            cursor.execute(f"SELECT id FROM {tabla} WHERE {columna} = ?", (valor,))
-            resultado = cursor.fetchone()
-            if resultado:
-                return resultado[0]
-            cursor.execute(f"INSERT INTO {tabla} ({columna}) VALUES (?)", (valor,))
-            return cursor.lastrowid
 
         def cargar_datos_db():
             for item in tabla.get_children():
@@ -48,42 +57,40 @@ class Proveedor(tk.Toplevel):
             conexion = sqlite3.connect(DB_PATH)
             cursor = conexion.cursor()
             
-            # CAMBIO: Como los proveedores ahora son "usuarios", usamos un JOIN masivo para 
-            # recolectar la información y filtramos estrictamente por el rol 'Proveedor'.
+            # CAMBIO: Extracción masiva con JOINs para reconstruir el perfil del Proveedor.
+            # Filtramos por el rol 'Proveedor'. Mapeamos "Razón Social" a 'nombres' y "Contacto" a 'apellidos'.
             cursor.execute('''
-                SELECT u.id, u.nombres, u.dni, 
-                       t.telefono, m.mail, 
-                       d.direccion, c.ciudad, p.provincia, cp.cp, 
-                       u.apellidos -- Reutilizamos 'apellidos' como 'Contacto'
+                SELECT u.id, u.nombres, u.dni, t.telefono, m.mail, d.direccion, c.ciudad, p.provincia, cp.cp, u.apellidos
                 FROM usuarios u
                 JOIN usuxroles ur ON u.id = ur.id_usuario
                 JOIN roles r ON ur.id_rol = r.id
-                LEFT JOIN usuarioxcontactos uc ON u.id = uc.id_usuario
-                LEFT JOIN contactoxtelefonos ct ON uc.id = ct.id_contacto
+                LEFT JOIN usuarioxcontactos uc ON u.id = uc.id_usuario AND uc.habilitado = 1
+                LEFT JOIN contactoxtelefonos ct ON uc.id = ct.id_contacto AND ct.habilitado = 1
                 LEFT JOIN telefonos t ON ct.id_telefono = t.id
-                LEFT JOIN contactoxmails cm ON uc.id = cm.id_contacto
+                LEFT JOIN contactoxmails cm ON uc.id = cm.id_contacto AND cm.habilitado = 1
                 LEFT JOIN mails m ON cm.id_mail = m.id
-                LEFT JOIN usuarioxubicaciones uu ON u.id = uu.id_usuario
-                LEFT JOIN ubicacionxdireccion ud ON uu.id = ud.id_ubicacion
+                LEFT JOIN usuarioxubicaciones uu ON u.id = uu.id_usuario AND uu.habilitado = 1
+                LEFT JOIN ubicacionxdireccion ud ON uu.id = ud.id_ubicacion AND ud.habilitado = 1
                 LEFT JOIN direcciones d ON ud.id_direccion = d.id
-                LEFT JOIN ubicacionxlocalidades ul ON uu.id = ul.id_ubicacion
-                LEFT JOIN localidadxciudades lc ON ul.id = lc.id_localidad
+                LEFT JOIN ubicacionxlocalidades ul ON uu.id = ul.id_ubicacion AND ul.habilitado = 1
+                LEFT JOIN localidadxciudades lc ON ul.id = lc.id_localidad AND lc.habilitado = 1
                 LEFT JOIN ciudades c ON lc.id_ciudad = c.id
                 LEFT JOIN codigopostales cp ON lc.id_cp = cp.id
-                LEFT JOIN localidadxprovincias lp ON ul.id = lp.id_localidad
+                LEFT JOIN localidadxprovincias lp ON ul.id = lp.id_localidad AND lp.habilitado = 1
                 LEFT JOIN provincias p ON lp.id_provincia = p.id
-                WHERE r.rol = 'Proveedor' AND u.habilitado = 1
+                WHERE r.rol = 'Proveedor' AND u.habilitado = 1 AND ur.habilitado = 1
             ''')
             filas = cursor.fetchall()
             
             for fila in filas:
-                tabla.insert("", "end", iid=fila[0], values=fila[1:])
 
+                # El ID viaja oculto en iid. Limpiamos los None a "S/D".
+                valores_limpios = ["S/D" if v is None else v for v in fila[1:]]
+                tabla.insert("", "end", iid=fila[0], values=valores_limpios)
+                
             conexion.close()
 
         def limpiar_campos():
-
-            # CAMBIO: Se retiró "caja_rubro" ya que la cátedra lo eliminó del esquema relacional.
             cajas = [caja_razon_social, caja_cuit, caja_telefono, caja_email, 
                      caja_domicilio, caja_ciudad, caja_provincia, caja_codigo_postal, caja_contacto]
                      
@@ -93,8 +100,6 @@ class Proveedor(tk.Toplevel):
             caja_razon_social.focus_set()
 
         def guardar():
-
-            # Mapeo: 'Razón Social' -> usuarios.nombres | 'CUIT' -> usuarios.dni | 'Contacto' -> usuarios.apellidos.
             razon_social = caja_razon_social.get().strip()
             cuit = caja_cuit.get().strip()
             telefono = caja_telefono.get().strip()
@@ -109,55 +114,54 @@ class Proveedor(tk.Toplevel):
                 messagebox.showwarning("Validación", "La Razón Social es obligatoria.")
                 return
 
-            # Para cumplir el requerimiento NOT NULL de la tabla usuarios, si contacto está vacío le ponemos guión.
-            if not contacto:
-                contacto = "-"
-
-            conexion = sqlite3.connect(DB_PATH)
-            cursor = conexion.cursor()
-            
             try:
-                # CAMBIO: Proceso transaccional en cascada (Normalización Extrema).
+                conexion = sqlite3.connect(DB_PATH)
+                cursor = conexion.cursor()
                 
-                # 1. Creación del Usuario Central.
-                cursor.execute("INSERT INTO usuarios (nombres, apellidos, dni) VALUES (?, ?, ?)", (razon_social, contacto, cuit))
+                # TRANSACCIÓN ESCALONADA DE INSERCIÓN MASIVA
+                
+                # 1. Tabla Central: Razón Social mapea a 'nombres', Contacto a 'apellidos', CUIT a 'dni'.
+                contacto_seguro = contacto if contacto else "S/D"
+                cursor.execute("INSERT INTO usuarios (nombres, apellidos, dni) VALUES (?, ?, ?)", (razon_social, contacto_seguro, cuit))
                 id_usuario = cursor.lastrowid
                 
-                # 2. Asignación del Rol.
-                id_rol = obtener_o_crear_catalogo(cursor, "roles", "rol", "Proveedor")
+                # 2. Asignación Estricta del Rol 'Proveedor'.
+                id_rol = obtener_o_crear(cursor, "roles", "rol", "Proveedor")
                 cursor.execute("INSERT INTO usuxroles (id_usuario, id_rol) VALUES (?, ?)", (id_usuario, id_rol))
                 
-                # 3. Creación y Vinculación de Contactos.
+                # 3. Contactos.
                 cursor.execute("INSERT INTO usuarioxcontactos (id_usuario) VALUES (?)", (id_usuario,))
                 id_contacto = cursor.lastrowid
                 
-                id_tel = obtener_o_crear_catalogo(cursor, "telefonos", "telefono", telefono)
-                cursor.execute("INSERT INTO contactoxtelefonos (id_contacto, id_telefono) VALUES (?, ?)", (id_contacto, id_tel))
+                id_telefono = obtener_o_crear(cursor, "telefonos", "telefono", telefono)
+                cursor.execute("INSERT INTO contactoxtelefonos (id_contacto, id_telefono) VALUES (?, ?)", (id_contacto, id_telefono))
                 
-                id_mail = obtener_o_crear_catalogo(cursor, "mails", "mail", email)
+                id_mail = obtener_o_crear(cursor, "mails", "mail", email)
                 cursor.execute("INSERT INTO contactoxmails (id_contacto, id_mail) VALUES (?, ?)", (id_contacto, id_mail))
                 
-                # 4. Creación y Vinculación de Ubicaciones.
+                # 4. Ubicaciones.
                 cursor.execute("INSERT INTO usuarioxubicaciones (id_usuario) VALUES (?)", (id_usuario,))
                 id_ubicacion = cursor.lastrowid
                 
-                id_dir = obtener_o_crear_catalogo(cursor, "direcciones", "direccion", domicilio)
-                cursor.execute("INSERT INTO ubicacionxdireccion (id_ubicacion, id_direccion) VALUES (?, ?)", (id_ubicacion, id_dir))
+                id_direccion = obtener_o_crear(cursor, "direcciones", "direccion", domicilio)
+                cursor.execute("INSERT INTO ubicacionxdireccion (id_ubicacion, id_direccion) VALUES (?, ?)", (id_ubicacion, id_direccion))
                 
                 cursor.execute("INSERT INTO ubicacionxlocalidades (id_ubicacion) VALUES (?)", (id_ubicacion,))
                 id_localidad = cursor.lastrowid
                 
-                id_ciudad = obtener_o_crear_catalogo(cursor, "ciudades", "ciudad", ciudad)
-                id_cp = obtener_o_crear_catalogo(cursor, "codigopostales", "cp", codigo_postal)
+                id_ciudad = obtener_o_crear(cursor, "ciudades", "ciudad", ciudad)
+                id_cp = obtener_o_crear(cursor, "codigopostales", "cp", codigo_postal)
                 cursor.execute("INSERT INTO localidadxciudades (id_localidad, id_ciudad, id_cp) VALUES (?, ?, ?)", (id_localidad, id_ciudad, id_cp))
                 
-                id_prov = obtener_o_crear_catalogo(cursor, "provincias", "provincia", provincia)
-                cursor.execute("INSERT INTO localidadxprovincias (id_localidad, id_provincia) VALUES (?, ?)", (id_localidad, id_prov))
+                id_provincia = obtener_o_crear(cursor, "provincias", "provincia", provincia)
+                cursor.execute("INSERT INTO localidadxprovincias (id_localidad, id_provincia) VALUES (?, ?)", (id_localidad, id_provincia))
                 
-                conexion.commit()
+                id_pais = obtener_o_crear(cursor, "paises", "pais", "Argentina")
+                cursor.execute("INSERT INTO localidadxpaises (id_localidad, id_pais) VALUES (?, ?)", (id_localidad, id_pais))
 
-            except sqlite3.Error as e:
-                messagebox.showerror("Error de Transacción", f"No se pudo guardar el proveedor: {e}")
+                conexion.commit()
+            except Exception as e:
+                messagebox.showerror("Error de Transacción", f"No se pudo guardar el registro: {e}")
             finally:
                 conexion.close()
 
@@ -176,16 +180,17 @@ class Proveedor(tk.Toplevel):
                      
             for i, caja in enumerate(cajas):
                 caja.delete(0, tk.END)
-                # Reemplazamos los valores nulos devueltos por LEFT JOINs con cadenas vacías.
-                valor_texto = valores[i] if valores[i] != 'None' else ""
-                caja.insert(0, valor_texto)
+
+                # Parseamos "S/D" a string vacío para la UI.
+                valor_mostrar = valores[i] if valores[i] != "S/D" else ""
+                caja.insert(0, valor_mostrar)
         
         def modificar():
             seleccion = tabla.selection()
             if not seleccion:
                 return
             
-            id_usuario = seleccion[0]
+            id_proveedor = seleccion[0]
             
             razon_social = caja_razon_social.get().strip()
             cuit = caja_cuit.get().strip()
@@ -201,80 +206,50 @@ class Proveedor(tk.Toplevel):
                 messagebox.showwarning("Validación", "La Razón Social es obligatoria.")
                 return
 
-            if not contacto:
-                contacto = "-"
-
-            conexion = sqlite3.connect(DB_PATH)
-            cursor = conexion.cursor()
-            
             try:
-                # CAMBIO: Modificación Transaccional Tolerante a Fallos. 
+                conexion = sqlite3.connect(DB_PATH)
+                cursor = conexion.cursor()
                 
-                # 1. Actualizamos datos directos del usuario.
-                cursor.execute("UPDATE usuarios SET nombres=?, apellidos=?, dni=? WHERE id=?", (razon_social, contacto, cuit, id_usuario))
+                # 1. Actualizamos la tabla central.
+                contacto_seguro = contacto if contacto else "S/D"
+                cursor.execute("UPDATE usuarios SET nombres=?, apellidos=?, dni=? WHERE id=?", (razon_social, contacto_seguro, cuit, id_proveedor))
                 
-                # 2. Actualización de Contactos.
-                cursor.execute("SELECT id FROM usuarioxcontactos WHERE id_usuario=?", (id_usuario,))
-                id_contacto = cursor.fetchone()
-
-                if id_contacto:
-                    id_contacto = id_contacto[0]
-                    id_tel_nuevo = obtener_o_crear_catalogo(cursor, "telefonos", "telefono", telefono)
-                    cursor.execute("UPDATE contactoxtelefonos SET id_telefono=? WHERE id_contacto=?", (id_tel_nuevo, id_contacto))
-                    
-                    id_mail_nuevo = obtener_o_crear_catalogo(cursor, "mails", "mail", email)
-                    cursor.execute("UPDATE contactoxmails SET id_mail=? WHERE id_contacto=?", (id_mail_nuevo, id_contacto))
-                else:
-
-                    # Fallback si el usuario no tenía árbol de contactos.
-                    cursor.execute("INSERT INTO usuarioxcontactos (id_usuario) VALUES (?)", (id_usuario,))
-                    id_contacto = cursor.lastrowid
-                    id_tel = obtener_o_crear_catalogo(cursor, "telefonos", "telefono", telefono)
-                    cursor.execute("INSERT INTO contactoxtelefonos (id_contacto, id_telefono) VALUES (?, ?)", (id_contacto, id_tel))
-                    id_mail = obtener_o_crear_catalogo(cursor, "mails", "mail", email)
-                    cursor.execute("INSERT INTO contactoxmails (id_contacto, id_mail) VALUES (?, ?)", (id_contacto, id_mail))
+                # 2. Desactivamos las relaciones viejas de contacto y ubicación (Borrado Lógico).
+                cursor.execute("UPDATE usuarioxcontactos SET habilitado=0 WHERE id_usuario=?", (id_proveedor,))
+                cursor.execute("UPDATE usuarioxubicaciones SET habilitado=0 WHERE id_usuario=?", (id_proveedor,))
                 
-                # 3. Actualización de Ubicaciones.
-                cursor.execute("SELECT id FROM usuarioxubicaciones WHERE id_usuario=?", (id_usuario,))
-                id_ubicacion = cursor.fetchone()
-
-                if id_ubicacion:
-                    id_ubicacion = id_ubicacion[0]
-                    id_dir_nuevo = obtener_o_crear_catalogo(cursor, "direcciones", "direccion", domicilio)
-                    cursor.execute("UPDATE ubicacionxdireccion SET id_direccion=? WHERE id_ubicacion=?", (id_dir_nuevo, id_ubicacion))
-                    
-                    cursor.execute("SELECT id FROM ubicacionxlocalidades WHERE id_ubicacion=?", (id_ubicacion,))
-                    id_localidad = cursor.fetchone()
-
-                    if id_localidad:
-                        id_localidad = id_localidad[0]
-                        id_ciudad_nueva = obtener_o_crear_catalogo(cursor, "ciudades", "ciudad", ciudad)
-                        id_cp_nuevo = obtener_o_crear_catalogo(cursor, "codigopostales", "cp", codigo_postal)
-                        cursor.execute("UPDATE localidadxciudades SET id_ciudad=?, id_cp=? WHERE id_localidad=?", (id_ciudad_nueva, id_cp_nuevo, id_localidad))
-                        
-                        id_prov_nueva = obtener_o_crear_catalogo(cursor, "provincias", "provincia", provincia)
-                        cursor.execute("UPDATE localidadxprovincias SET id_provincia=? WHERE id_localidad=?", (id_prov_nueva, id_localidad))
-                else:
-                    # Fallback si el usuario no tenía árbol de ubicaciones.
-                    cursor.execute("INSERT INTO usuarioxubicaciones (id_usuario) VALUES (?)", (id_usuario,))
-                    id_ubicacion = cursor.lastrowid
-                    id_dir = obtener_o_crear_catalogo(cursor, "direcciones", "direccion", domicilio)
-                    cursor.execute("INSERT INTO ubicacionxdireccion (id_ubicacion, id_direccion) VALUES (?, ?)", (id_ubicacion, id_dir))
-                    
-                    cursor.execute("INSERT INTO ubicacionxlocalidades (id_ubicacion) VALUES (?)", (id_ubicacion,))
-                    id_localidad = cursor.lastrowid
-                    
-                    id_ciudad = obtener_o_crear_catalogo(cursor, "ciudades", "ciudad", ciudad)
-                    id_cp = obtener_o_crear_catalogo(cursor, "codigopostales", "cp", codigo_postal)
-                    cursor.execute("INSERT INTO localidadxciudades (id_localidad, id_ciudad, id_cp) VALUES (?, ?, ?)", (id_localidad, id_ciudad, id_cp))
-                    
-                    id_prov = obtener_o_crear_catalogo(cursor, "provincias", "provincia", provincia)
-                    cursor.execute("INSERT INTO localidadxprovincias (id_localidad, id_provincia) VALUES (?, ?)", (id_localidad, id_prov))
+                # 3. Insertamos el nuevo esquema de relaciones.
+                cursor.execute("INSERT INTO usuarioxcontactos (id_usuario) VALUES (?)", (id_proveedor,))
+                id_contacto_nuevo = cursor.lastrowid
+                
+                id_telefono = obtener_o_crear(cursor, "telefonos", "telefono", telefono)
+                cursor.execute("INSERT INTO contactoxtelefonos (id_contacto, id_telefono) VALUES (?, ?)", (id_contacto_nuevo, id_telefono))
+                
+                id_mail = obtener_o_crear(cursor, "mails", "mail", email)
+                cursor.execute("INSERT INTO contactoxmails (id_contacto, id_mail) VALUES (?, ?)", (id_contacto_nuevo, id_mail))
+                
+                cursor.execute("INSERT INTO usuarioxubicaciones (id_usuario) VALUES (?)", (id_proveedor,))
+                id_ubicacion = cursor.lastrowid
+                
+                id_direccion = obtener_o_crear(cursor, "direcciones", "direccion", domicilio)
+                cursor.execute("INSERT INTO ubicacionxdireccion (id_ubicacion, id_direccion) VALUES (?, ?)", (id_ubicacion, id_direccion))
+                
+                cursor.execute("INSERT INTO ubicacionxlocalidades (id_ubicacion) VALUES (?)", (id_ubicacion,))
+                id_localidad = cursor.lastrowid
+                
+                id_ciudad = obtener_o_crear(cursor, "ciudades", "ciudad", ciudad)
+                id_cp = obtener_o_crear(cursor, "codigopostales", "cp", codigo_postal)
+                cursor.execute("INSERT INTO localidadxciudades (id_localidad, id_ciudad, id_cp) VALUES (?, ?, ?)", (id_localidad, id_ciudad, id_cp))
+                
+                id_provincia = obtener_o_crear(cursor, "provincias", "provincia", provincia)
+                cursor.execute("INSERT INTO localidadxprovincias (id_localidad, id_provincia) VALUES (?, ?)", (id_localidad, id_provincia))
+                
+                id_pais = obtener_o_crear(cursor, "paises", "pais", "Argentina")
+                cursor.execute("INSERT INTO localidadxpaises (id_localidad, id_pais) VALUES (?, ?)", (id_localidad, id_pais))
 
                 conexion.commit()
-
-            except sqlite3.Error as e:
-                messagebox.showerror("Error de Actualización", f"No se pudo modificar el proveedor: {e}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Fallo al actualizar: {e}")
             finally:
                 conexion.close()
 
@@ -286,19 +261,19 @@ class Proveedor(tk.Toplevel):
             if not seleccion:
                 return
                 
-            conexion = sqlite3.connect(DB_PATH)
-            cursor = conexion.cursor()
-            
-            # CAMBIO: Aplicación de Baja Lógica (UPDATE en lugar de DELETE).
             try:
-                for item in seleccion:
-                    cursor.execute("UPDATE usuarios SET habilitado = 0 WHERE id = ?", (item,))
-                    cursor.execute("UPDATE usuxroles SET habilitado = 0 WHERE id_usuario = ?", (item,))
-
-                conexion.commit()
+                conexion = sqlite3.connect(DB_PATH)
+                cursor = conexion.cursor()
                 
+                for item in seleccion:
+
+                    # Aplicamos el Borrado Lógico.
+                    cursor.execute("UPDATE usuarios SET habilitado=0 WHERE id=?", (item,))
+                    cursor.execute("UPDATE usuxroles SET habilitado=0 WHERE id_usuario=?", (item,))
+                    
+                conexion.commit()
             except sqlite3.Error as e:
-                messagebox.showerror("Error", f"No se pudo dar de baja al proveedor: {e}")
+                messagebox.showerror("Operación Bloqueada", str(e))
             finally:
                 conexion.close()
             
@@ -311,40 +286,41 @@ class Proveedor(tk.Toplevel):
         #  CAMPOS DEL "FORMULARIO PROVEEDORES"
         # =====================================
 
+        # CAMBIO: Se eliminó 'Rubro' para adaptar la UI a la tabla central 'usuarios' normalizada.
         tk.Label(self, text="Razón Social").grid(row=1, column=0, pady=5, sticky="e", padx=5)
-        caja_razon_social = tk.Entry(self)
+        caja_razon_social = tk.Entry(self, width=30)
         caja_razon_social.grid(row=1, column=1)
 
         tk.Label(self, text="CUIT").grid(row=2, column=0, pady=5, sticky="e", padx=5)
-        caja_cuit = tk.Entry(self)
+        caja_cuit = tk.Entry(self, width=30)
         caja_cuit.grid(row=2, column=1)
 
         tk.Label(self, text="Teléfono").grid(row=3, column=0, pady=5, sticky="e", padx=5)
-        caja_telefono = tk.Entry(self)
+        caja_telefono = tk.Entry(self, width=30)
         caja_telefono.grid(row=3, column=1)
 
         tk.Label(self, text="Email").grid(row=4, column=0, pady=5, sticky="e", padx=5)
-        caja_email = tk.Entry(self)
+        caja_email = tk.Entry(self, width=30)
         caja_email.grid(row=4, column=1)
 
-        tk.Label(self, text="Domicilio").grid(row=5, column=0, pady=5, sticky="e", padx=5)
-        caja_domicilio = tk.Entry(self)
+        tk.Label(self, text="Dirección").grid(row=5, column=0, pady=5, sticky="e", padx=5)
+        caja_domicilio = tk.Entry(self, width=30)
         caja_domicilio.grid(row=5, column=1)
 
         tk.Label(self, text="Ciudad").grid(row=6, column=0, pady=5, sticky="e", padx=5)
-        caja_ciudad = tk.Entry(self)
+        caja_ciudad = tk.Entry(self, width=30)
         caja_ciudad.grid(row=6, column=1)
 
         tk.Label(self, text="Provincia").grid(row=7, column=0, pady=5, sticky="e", padx=5)
-        caja_provincia = tk.Entry(self)
+        caja_provincia = tk.Entry(self, width=30)
         caja_provincia.grid(row=7, column=1)
 
         tk.Label(self, text="Código Postal").grid(row=8, column=0, pady=5, sticky="e", padx=5)
-        caja_codigo_postal = tk.Entry(self)
+        caja_codigo_postal = tk.Entry(self, width=30)
         caja_codigo_postal.grid(row=8, column=1)
 
-        tk.Label(self, text="Contacto").grid(row=9, column=0, pady=5, sticky="e", padx=5)
-        caja_contacto = tk.Entry(self)
+        tk.Label(self, text="Contacto (Rep.)").grid(row=9, column=0, pady=5, sticky="e", padx=5)
+        caja_contacto = tk.Entry(self, width=30)
         caja_contacto.grid(row=9, column=1)
 
 
@@ -353,17 +329,17 @@ class Proveedor(tk.Toplevel):
         #  BOTONES "GUARDAR, MODIFICAR, ELIMINAR Y CERRAR VENTANA"
         # =========================================================
 
-        boton_guardar = tk.Button(self, text="Guardar Proveedor", command=guardar, bg="#4CAF50", fg="white", font=("Arial", 9, "bold"), width=15)
-        boton_guardar.grid(row=3, column=3, padx=20)
+        boton_guardar = tk.Button(self, text="Guardar Proveedor", command=guardar, bg="#4CAF50", fg="white", font=("Arial", 9, "bold"), width=16)
+        boton_guardar.grid(row=2, column=3, padx=20)
 
-        boton_modificar = tk.Button(self, text="Modificar Proveedor", command=modificar, bg="#2196F3", fg="white", font=("Arial", 9, "bold"), width=15)
-        boton_modificar.grid(row=5, column=3, padx=20)
+        boton_modificar = tk.Button(self, text="Modificar Proveedor", command=modificar, bg="#2196F3", fg="white", font=("Arial", 9, "bold"), width=16)
+        boton_modificar.grid(row=4, column=3, padx=20)
 
-        boton_eliminar = tk.Button(self, text="Eliminar Proveedor", command=eliminar, bg="#F44336", fg="white", font=("Arial", 9, "bold"), width=15)
-        boton_eliminar.grid(row=7, column=3, padx=20)
+        boton_eliminar = tk.Button(self, text="Eliminar Proveedor", command=eliminar, bg="#F44336", fg="white", font=("Arial", 9, "bold"), width=16)
+        boton_eliminar.grid(row=6, column=3, padx=20)
 
-        boton_cerrar_ventana = tk.Button(self, text="Cerrar Ventana", command=self.destroy, bg="#9E9E9E", fg="white", font=("Arial", 9, "bold"), width=15)
-        boton_cerrar_ventana.grid(row=9, column=3, padx=20)
+        boton_cerrar_ventana = tk.Button(self, text="Cerrar Ventana", command=self.destroy, bg="#9E9E9E", fg="white", font=("Arial", 9, "bold"), width=16)
+        boton_cerrar_ventana.grid(row=8, column=3, padx=20)
 
 
 
@@ -371,16 +347,15 @@ class Proveedor(tk.Toplevel):
         #  TABLA DE DATOS DE PROVEEDORES
         # ===============================
 
-        # CAMBIO: Columnas sincronizadas con la ausencia del campo Rubro.
-        columnas = ("Razón Social", "CUIT", "Teléfono", "Email", "Domicilio", "Ciudad", "Provincia", "Código Postal", "Contacto")
+        columnas = ("Razón Social", "CUIT", "Teléfono", "Email", "Dirección", "Ciudad", "Provincia", "Cód. Postal", "Contacto")
 
         tabla = ttk.Treeview(self, columns=columnas, show="headings", height=10)
 
         for col in columnas:
             tabla.heading(col, text=col)
-            tabla.column(col, width=105)
+            tabla.column(col, width=100)
 
-        tabla.grid(row=11, column=0, columnspan=5, pady=20, padx=10)
+        tabla.grid(row=11, column=0, columnspan=5, pady=20, padx=10, sticky="nsew")
         tabla.bind("<<TreeviewSelect>>", seleccionar_fila)
 
 

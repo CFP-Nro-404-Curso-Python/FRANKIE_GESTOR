@@ -1,0 +1,18 @@
+# ==========================
+#  DEPENDENCIAS DEL SISTEMA
+# ==========================
+
+# Librería estándar de la industria para el hashing seguro de contraseñas.
+# Incorpora la generación de "sal" (salt) automática y ralentiza intencionalmente 
+# la validación para mitigar ataques de diccionario y fuerza bruta.
+bcrypt==5.0.0
+
+# Motor de procesamiento vectorial y análisis de datos en memoria RAM (OLAP).
+# Reemplaza los bucles nativos de Python por estructuras DataFrame optimizadas en C,
+# permitiendo agrupaciones estadísticas, series temporales y cruces masivos al instante.
+pandas==3.0.6
+
+# Librería de renderizado gráfico y visualización científica.
+# Provee el motor de trazado y el conector (FigureCanvasTkAgg) para incrustar 
+# lienzos estadísticos (barras, líneas, torta) directamente en el DOM de Tkinter.
+matplotlib==3.11.2

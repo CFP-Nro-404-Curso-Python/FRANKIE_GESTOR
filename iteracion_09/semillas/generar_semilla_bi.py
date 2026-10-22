@@ -16,9 +16,9 @@ DB_PATH = os.path.join(DIRECTORIO_RAIZ, "db", "frankie_gestor.db")
 SQL_CATEDRA_PATH = os.path.join(DIRECTORIO_SEMILLAS, "empresa_ventas_1000.sql")
 
 def generar_semilla():
-    print("==================================================")
+    print("\n==================================================")
     print(" INICIANDO PROCESO DE MIGRACIÓN ETL (SEMILLA BI) ")
-    print("==================================================")
+    print("==================================================\n")
     
     if not os.path.exists(DB_PATH):
         print(f"[!] ERROR CRÍTICO: No se encontró la base de datos maestra en:\n{DB_PATH}")
@@ -38,9 +38,6 @@ def generar_semilla():
         # =========================================================
         #  FASE 1: PREPARACIÓN DEL ECOSISTEMA (ENTIDADES FANTASMA)
         # =========================================================
-
-        # Dado que nuestro esquema exige Normalización Extrema (3FN), no podemos inyectar ventas al aire. 
-        # Necesitamos un Vendedor, un Cliente y un Proveedor genéricos.
         
         print("[*] Verificando/Creando usuarios genéricos para cumplir claves foráneas...")
         
@@ -82,8 +79,6 @@ def generar_semilla():
         with open(SQL_CATEDRA_PATH, 'r', encoding='utf-8') as file:
             contenido_sql = file.read()
             
-        # Extraemos el bloque de INSERT INTO productos usando Regex.
-        # Busca todo lo que esté entre "INSERT INTO productos... VALUES" y el primer ";"
         patron_productos = re.compile(r'INSERT INTO productos[^V]+VALUES\s*(.*?);', re.DOTALL | re.IGNORECASE)
         match_productos = patron_productos.search(contenido_sql)
         
@@ -91,27 +86,21 @@ def generar_semilla():
             raise Exception("No se encontró el bloque INSERT INTO productos en el archivo SQL.")
             
         bloque_valores_prod = match_productos.group(1)
-        
-        # Parseamos las tuplas crudas de SQL.
-        # Las convierte en una lista de listas de Python para poder iterarlas.
         tuplas_productos = re.findall(r'\((.*?)\)', bloque_valores_prod)
         
         print(f"[*] Migrando {len(tuplas_productos)} productos al esquema relacional...")
         
         productos_insertados = 0
         for tupla in tuplas_productos:
-            # Separamos los valores por coma (teniendo cuidado con comillas simples).
             valores = [v.strip().strip("'") for v in tupla.split(',')]
             
-            # Formato origen: (id_producto, nombre, categoria, precio).
             id_orig = valores[0]
-            codigo = f"PROD-BI-{id_orig.zfill(4)}"  # Generamos un código único requerido por nuestro esquema.
+            codigo = f"PROD-BI-{id_orig.zfill(4)}"
             descripcion = valores[1]
             categoria = valores[2]
-            precio_costo = float(valores[3]) * 0.70  # Simulamos un margen de ganancia del 30%.
+            precio_costo = float(valores[3]) * 0.70
             precio_venta = float(valores[3])
             
-            # Verificamos si el producto ya fue inyectado en una ejecución anterior.
             cursor.execute("SELECT id FROM productos WHERE codigo=?", (codigo,))
             if not cursor.fetchone():
                 cursor.execute('''
@@ -119,10 +108,18 @@ def generar_semilla():
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (codigo, descripcion, categoria, id_proveedor, 500.0, precio_costo, precio_venta))
                 
-                # Regla de negocio de la Iteración 08: Obliga a registrar el estado del stock.
                 id_nuevo_prod = cursor.lastrowid
+                
+                # REFACTORIZACIÓN: Lógica Get or Create para el catálogo de estados.
                 cursor.execute("SELECT id FROM estados WHERE estado='Disponible'")
-                id_estado = cursor.fetchone()[0]
+                res_estado = cursor.fetchone()
+                
+                if not res_estado:
+                    cursor.execute("INSERT INTO estados (estado) VALUES ('Disponible')")
+                    id_estado = cursor.lastrowid
+                else:
+                    id_estado = res_estado[0]
+                    
                 cursor.execute("INSERT INTO productoxestados (id_producto, id_estado) VALUES (?, ?)", (id_nuevo_prod, id_estado))
                 productos_insertados += 1
                 
@@ -134,7 +131,6 @@ def generar_semilla():
         #  FASE 3: PARSEO Y MIGRACIÓN DEL HISTORIAL DE VENTAS
         # ====================================================
 
-        # Extraemos el bloque de INSERT INTO ventas.
         patron_ventas = re.compile(r'INSERT INTO ventas[^V]+VALUES\s*(.*?);', re.DOTALL | re.IGNORECASE)
         match_ventas = patron_ventas.search(contenido_sql)
         
@@ -146,8 +142,6 @@ def generar_semilla():
         
         print(f"\n[*] Migrando {len(tuplas_ventas)} transacciones de venta...")
         
-        # Validamos cuántas ventas hay actualmente para evitar duplicar el bloque entero si el usuario ejecuta 
-        # este script dos veces por error.
         cursor.execute("SELECT COUNT(*) FROM facturacion WHERE id_vendedor=?", (id_vendedor,))
         ventas_existentes = cursor.fetchone()[0]
         
@@ -158,13 +152,11 @@ def generar_semilla():
             for tupla in tuplas_ventas:
                 valores = [v.strip().strip("'") for v in tupla.split(',')]
                 
-                # Formato origen: (id_producto, cantidad, fecha).
                 id_prod_origen = valores[0]
                 codigo_busqueda = f"PROD-BI-{id_prod_origen.zfill(4)}"
                 cantidad = float(valores[1])
-                fecha_historica = f"{valores[2]} 12:00:00" # Concatenamos hora falsa para cumplir con DATETIME.
+                fecha_historica = f"{valores[2]} 12:00:00"
                 
-                # Buscamos el ID real que SQLite le asignó al producto y su precio.
                 cursor.execute("SELECT id, precio_venta FROM productos WHERE codigo=?", (codigo_busqueda,))
                 res_prod = cursor.fetchone()
                 
@@ -172,7 +164,6 @@ def generar_semilla():
                     id_producto_real = res_prod[0]
                     valor_congelado = res_prod[1]
                     
-                    # Inyección en la tabla transaccional (El campo 'total' lo calcula y guarda SQLite solo).
                     cursor.execute('''
                         INSERT INTO facturacion (fecha, id_vendedor, id_cliente, id_producto, cantidad, valor)
                         VALUES (?, ?, ?, ?, ?, ?)
@@ -181,11 +172,10 @@ def generar_semilla():
             
             print(f"    -> Se insertaron {ventas_insertadas} comprobantes históricos exitosamente.")
         
-        # Ejecutamos el COMMIT final consolidando la transacción ETL completa.
         conexion.commit()
-        print("\n==================================================")
+        print("\n===============================================")
         print(" MIGRACIÓN ETL COMPLETADA. BASE LISTA PARA BI. ")
-        print("==================================================")
+        print("===============================================\n")
 
     except Exception as e:
         print(f"\n[!] SE PRODUJO UN ERROR DURANTE LA MIGRACIÓN: {e}")

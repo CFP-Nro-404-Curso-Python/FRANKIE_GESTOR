@@ -1,0 +1,67 @@
+# =============================================================================================================
+#  MANIFIESTO DE DEPENDENCIAS DEL SISTEMA (ITERACIÓN 10 - ARQUITECTURA LIMPIA)
+# =============================================================================================================
+#  NOTA DE INGENIERÍA: Se omiten las cotas rígidas de versión (version pinning) para permitir que el resolutor 
+#  de paquetes de pip descargue los binarios precompilados (wheels) más recientes y compatibles con la versión 
+#  local del intérprete de Python, previniendo conflictos de compilación en C/C++.
+# =============================================================================================================
+
+# -------------------------------------------------------------------------------------------------------------
+#  1. SEGURIDAD Y CRIPTOGRAFÍA (CAPA DE INFRAESTRUCTURA)
+# -------------------------------------------------------------------------------------------------------------
+
+# Librería estándar de la industria para el hashing adaptativo de contraseñas.
+# Incorpora la generación automática de "sal" (salt) criptográfica y aplica un factor de costo computacional 
+# para mitigar ataques de diccionario y fuerza bruta.
+bcrypt
+
+# ---------------------------------------------------------------------------------------------------------------
+#  2. SERVIDOR BACKEND Y CONTRATOS API REST (CAPA DE INFRAESTRUCTURA)
+# ---------------------------------------------------------------------------------------------------------------
+
+# Framework moderno de alto rendimiento para la construcción de APIs RESTful.
+# Utiliza tipado estático de Python ( vía Pydantic) para validar y serializar automáticamente los paquetes JSON 
+# de entrada y salida, además de autogenerar la documentación interactiva bajo el estándar OpenAPI (Swagger UI).
+fastapi
+
+# Servidor web ASGI (Asynchronous Server Gateway Interface) ultraligero.
+# Actúa como el motor de ejecución en tiempo real que escucha las peticiones de red en un puerto local (HTTP) y 
+# las canaliza hacia las rutas de FastAPI.
+uvicorn
+
+# ---------------------------------------------------------------------------------------------------------------
+#  3. COMUNICACIÓN CLIENTE-SERVIDOR Y VISUALIZACIÓN (CAPA DE PRESENTACIÓN)
+# ---------------------------------------------------------------------------------------------------------------
+
+# Cliente HTTP sincrónico para Python.
+# Permite que el adaptador de escritorio (Tkinter) envíe peticiones (GET, POST, PUT, DELETE) al servidor backend 
+# y reciba respuestas JSON, erradicando por completo el acoplamiento directo con SQLite.
+requests
+
+# Librería de renderizado gráfico y visualización científica.
+# Provee el motor de trazado y el conector de interfaz (FigureCanvasTkAgg) para dibujar los gráficos estadísticos 
+# en el cliente de escritorio a partir de los datos JSON ya procesados que entrega la API.
+matplotlib
+
+# -----------------------------------------------------------------------------------------------------------------
+#  4. PROCESAMIENTO ANALÍTICO OLAP (BUSINESS INTELLIGENCE)
+# -----------------------------------------------------------------------------------------------------------------
+
+# Motor de procesamiento vectorial y análisis de datos en memoria RAM.
+# Reemplaza los bucles nativos de Python en el backend por estructuras DataFrame optimizadas en C, resolviendo 
+# agrupaciones estadísticas, métricas KPI y series temporales antes de serializar los resultados hacia las vistas.
+pandas
+
+# ----------------------------------------------------------------------------------------------------------------
+#  5. CALIDAD DE SOFTWARE Y AUTOMATIZACIÓN DE PRUEBAS (METODOLOGÍA TDD)
+# ----------------------------------------------------------------------------------------------------------------
+
+# Framework de testing modular para Python.
+# Permite descubrir, orquestar y ejecutar aserciones sobre la lógica de dominio (tests unitarios) y sobre la 
+# persistencia SQLite en memoria (tests de integración) mediante el uso de accesorios de prueba (fixtures).
+pytest
+
+# Cliente HTTP de nueva generación con soporte sincrónico y asincrónico.
+# Es requerido internamente por el módulo TestClient de FastAPI para simular peticiones HTTP contra los endpoints 
+# de la API directamente en memoria RAM, sin necesidad de encender un puerto de red real durante las pruebas TDD.
+httpx

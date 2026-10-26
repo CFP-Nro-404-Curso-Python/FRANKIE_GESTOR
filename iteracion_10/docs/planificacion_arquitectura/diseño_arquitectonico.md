@@ -80,7 +80,7 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 │   │       ├── 🐍 esquemas_validacion.py        # Objetos de Transferencia de Datos (DTOs con Pydantic).
 │   │       ├── 🐍 inyector_dependencias.py      # Fábrica de servicios e intercepción de cabeceras RBAC.
 │   │       ├── 🐍 rutas_perfiles.py             # Endpoints HTTP para autenticación y entidades humanas.
-│   │       ├── 🐍 rutas_operaciones.py          # Endpoints HTTP para stock, facturación, consola y BI (Business Intelligence).
+│   │       ├── 🐍 rutas_operaciones.py          # Endpoints HTTP para stock, facturación, consola y BI.
 │   │       └── 🐍 servidor.py                   # Instancia FastAPI, manejo global de excepciones y CORS.
 │   │
 │   └── 📁 presentacion/                         # CAPA 4: Adaptadores de Interfaz de Usuario (Clientes HTTP).
@@ -98,7 +98,7 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 │       │       ├── 🐍 consola.py
 │       │       └── 🐍 analitica.py
 │       └── 📁 web/                              # Vista 2: Cliente ligero Web (HTML5 + CSS + JS Vanilla).
-│           ├── 🌐 index.html                     # Aplicación de Página Única (SPA).
+│           ├── 🌐 index.html                    # Aplicación de Página Única (SPA).
 │           ├── 🎨 estilos.css
 │           └── 📜 app_web.js                    # Consumo asíncrono (fetch) de los mismos endpoints REST.
 │
@@ -113,5 +113,6 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 │       └── 🐍 test_api_rest.py                  # Verifica respuestas HTTP, validaciones y bloqueos de seguridad.
 │
 ├── 📁 .venv/
+├── 📄 pytest.ini                                # Configuración de rutas para entorno de testing (Pytest).
 └── 📄 requirements.txt                          # Manifiesto de paquetes (agrega fastapi, uvicorn, requests, pytest, httpx).
 ```

@@ -43,8 +43,14 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 ├── 📁 db/                                       # Persistencia física aislada.
 │   ├── 📜 esquema.sql                           # DDL relacional 3FN, Vistas y Triggers.
 │   └── 🗄️ frankie_gestor.db                     # Base de datos generada en tiempo de ejecución.
+├── 📁 diagramas/                                # Almacenamiento para diagramas de arquitectura UML/Flujo (reservado).
 ├── 📁 docs/                                     # Documentación técnica de ingeniería.
-│   └── 📝 desarrollo.md                         # Entregable final: justificación S.O.L.I.D., patrones y TDD.
+│   ├── 📝 descripcion.md                        # Entregable final: justificación S.O.L.I.D., patrones y TDD.
+│   ├── 📁 fundamentos/                          # Bases analíticas y de planificación.
+│   │   ├── 📝 diseño_arquitectonico.md
+│   │   └── 📝 plan_construccion_guiado_TDD.md
+│   └── 📁 reportes/                             # Bitácora de pruebas y progreso.
+│       └── 📝 etapa_1.md
 ├── 📁 semillas/                                 # Pipeline ETL de datos de prueba.
 │   ├── 📜 empresa_ventas_1000.sql
 │   └── 🐍 generador_semilla_bi.py
@@ -87,16 +93,16 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 │       ├── 📁 escritorio/                       # Vista 1: Cliente pesado en Tkinter (Cero SQL y cero Bcrypt).
 │       │   ├── 🐍 cliente_api.py                # Cliente HTTP centralizado (encapsula librería requests).
 │       │   └── 📁 vistas/
-│       │       ├── 🐍 login.py
-│       │       ├── 🐍 panel_control.py
-│       │       ├── 🐍 usuarios.py
-│       │       ├── 🐍 empleados.py
-│       │       ├── 🐍 clientes.py
-│       │       ├── 🐍 proveedores.py
-│       │       ├── 🐍 stock.py
-│       │       ├── 🐍 facturacion.py
-│       │       ├── 🐍 consola.py
-│       │       └── 🐍 analitica.py
+│       │   │   ├── 🐍 login.py
+│       │   │   ├── 🐍 panel_control.py
+│       │   │   ├── 🐍 usuarios.py
+│       │   │   ├── 🐍 empleados.py
+│       │   │   ├── 🐍 clientes.py
+│       │   │   ├── 🐍 proveedores.py
+│       │   │   ├── 🐍 stock.py
+│       │   │   ├── 🐍 facturacion.py
+│       │   │   ├── 🐍 consola.py
+│       │   │   └── 🐍 analitica.py
 │       └── 📁 web/                              # Vista 2: Cliente ligero Web (HTML5 + CSS + JS Vanilla).
 │           ├── 🌐 index.html                    # Aplicación de Página Única (SPA).
 │           ├── 🎨 estilos.css
@@ -115,4 +121,4 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 ├── 📁 .venv/
 ├── 📄 pytest.ini                                # Configuración de rutas para entorno de testing (Pytest).
 └── 📄 requirements.txt                          # Manifiesto de paquetes (agrega fastapi, uvicorn, requests, pytest, httpx).
-```
+´´´

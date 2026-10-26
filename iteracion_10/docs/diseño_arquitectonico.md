@@ -1,4 +1,4 @@
-# 🧠 Justificación Analítica del Diseño Arquitectónico (Iteración 10)
+# 🧠 Justificación Analítica del Diseño Arquitectónico
 
 ## 1. Aislamiento Total e Inmutabilidad del Núcleo (Arquitectura Hexagonal + API REST)
 

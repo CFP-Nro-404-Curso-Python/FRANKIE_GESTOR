@@ -74,7 +74,8 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 │   │   ├── 🐍 __init__.py
 │   │   ├── 📁 persistencia/
 │   │   │   ├── 🐍 __init__.py
-│   │   │   ├── 🐍 gestor_sqlite.py              # Unidad de Trabajo ACID y helper único obtener_o_crear.
+│   │   │   ├── 🐍 gestor_sqlite.py              # Unidad de Trabajo ACID para control de transacciones.
+│   │   │   ├── 🐍 utilidades_sql.py             # Módulo puro con el helper obtener_o_crear (SRP).
 │   │   │   ├── 🐍 repositorio_perfiles_sql.py   # Transacciones escalonadas sobre tabla 'usuarios' y puentes.
 │   │   │   ├── 🐍 repositorio_productos_sql.py  # Persistencia de productos, estados y ubicaciones.
 │   │   │   └── 🐍 repositorio_ventas_sql.py     # Persistencia de facturación, auditoría y consultas Pandas.
@@ -93,16 +94,16 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 │       ├── 📁 escritorio/                       # Vista 1: Cliente pesado en Tkinter (Cero SQL y cero Bcrypt).
 │       │   ├── 🐍 cliente_api.py                # Cliente HTTP centralizado (encapsula librería requests).
 │       │   └── 📁 vistas/
-│       │   │   ├── 🐍 login.py
-│       │   │   ├── 🐍 panel_control.py
-│       │   │   ├── 🐍 usuarios.py
-│       │   │   ├── 🐍 empleados.py
-│       │   │   ├── 🐍 clientes.py
-│       │   │   ├── 🐍 proveedores.py
-│       │   │   ├── 🐍 stock.py
-│       │   │   ├── 🐍 facturacion.py
-│       │   │   ├── 🐍 consola.py
-│       │   │   └── 🐍 analitica.py
+│       │       ├── 🐍 login.py
+│       │       ├── 🐍 panel_control.py
+│       │       ├── 🐍 usuarios.py
+│       │       ├── 🐍 empleados.py
+│       │       ├── 🐍 clientes.py
+│       │       ├── 🐍 proveedores.py
+│       │       ├── 🐍 stock.py
+│       │       ├── 🐍 facturacion.py
+│       │       ├── 🐍 consola.py
+│       │       └── 🐍 analitica.py
 │       └── 📁 web/                              # Vista 2: Cliente ligero Web (HTML5 + CSS + JS Vanilla).
 │           ├── 🌐 index.html                    # Aplicación de Página Única (SPA).
 │           ├── 🎨 estilos.css

@@ -50,7 +50,7 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 │   │   ├── 📝 diseño_arquitectonico.md
 │   │   └── 📝 plan_construccion_guiado_TDD.md
 │   └── 📁 reportes/                             # Bitácora de pruebas y progreso.
-│       └── 📝 etapa_1.md
+│       └── 📝 etapa_n.md
 ├── 📁 semillas/                                 # Pipeline ETL de datos de prueba.
 │   ├── 📜 empresa_ventas_1000.sql
 │   └── 🐍 generador_semilla_bi.py

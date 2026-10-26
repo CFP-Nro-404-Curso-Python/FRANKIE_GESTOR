@@ -2,7 +2,7 @@ import sqlite3
 from typing import Optional
 from src.dominio.entidades import Producto
 from src.dominio.puertos import PuertoRepositorioProductos
-from src.infraestructura.persistencia.gestor_sqlite import obtener_o_crear
+from src.infraestructura.persistencia.utilidades_sql import obtener_o_crear
 
 # ============================================================================
 #  REPOSITORIO DE PRODUCTOS SQL (CAPA 3 - INFRAESTRUCTURA)

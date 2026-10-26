@@ -5,44 +5,6 @@ from src.infraestructura.persistencia.repositorio_perfiles_sql import Repositori
 from src.infraestructura.persistencia.repositorio_productos_sql import RepositorioProductosSQL
 from src.infraestructura.persistencia.repositorio_ventas_sql import RepositorioVentasSQL
 
-# ===============================================================================
-#  HELPER CENTRALIZADO DE TRANSACCIONES (PRINCIPIO DRY)
-# ===============================================================================
-#  DECISIÓN DE DISEÑO (KISS):
-#  
-#   En lugar de copiar y pegar esta lógica en cada repositorio como hacíamos 
-#   en la Iteración 08/09, la centralizamos acá. Sirve para poblar los catálogos 
-#   satélites (3FN) de forma dinámica sin romper la integridad relacional.
-# ===============================================================================
-
-
-
-def obtener_o_crear(cursor: sqlite3.Cursor, tabla: str, columna: str, valor: str) -> int:
-    """
-     Busca un valor en un catálogo satélite (ej. ciudades, estados). 
-     Si existe, devuelve su ID. Si no existe, lo inserta y devuelve el nuevo ID.
-     Al usar el cursor activo, participa en la misma transacción ACID en curso.
-    """
-    if not valor or str(valor).strip() == "":
-        return None
-        
-    valor_limpio = str(valor).strip().upper()
-    
-    # Busca si el registro ya existe.
-    query_busqueda = f"SELECT id FROM {tabla} WHERE {columna} = ?"
-    cursor.execute(query_busqueda, (valor_limpio,))
-    resultado = cursor.fetchone()
-    
-    if resultado:
-        return resultado[0]
-    
-    # Si no existe, lo crea.
-    query_insercion = f"INSERT INTO {tabla} ({columna}) VALUES (?)"
-    cursor.execute(query_insercion, (valor_limpio,))
-    return cursor.lastrowid
-
-
-
 # ===========================================================================
 #  GESTOR DE TRANSACCIONES / UNIDAD DE TRABAJO (CAPA 3 - INFRAESTRUCTURA)
 # ===========================================================================

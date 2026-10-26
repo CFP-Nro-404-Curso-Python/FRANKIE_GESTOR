@@ -2,7 +2,7 @@ import sqlite3
 from typing import List, Optional
 from src.dominio.entidades import PerfilUsuario
 from src.dominio.puertos import PuertoRepositorioPerfiles
-from src.infraestructura.persistencia.gestor_sqlite import obtener_o_crear
+from src.infraestructura.persistencia.utilidades_sql import obtener_o_crear
 
 # =============================================================================
 #  REPOSITORIO DE PERFILES SQL (CAPA 3 - INFRAESTRUCTURA)
@@ -32,9 +32,9 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         """
         cursor = self.conexion.cursor()
         
-        # 1. Insertar datos maestros en la tabla central.
+        # 1. Insertar datos maestros en la tabla central (columna física: password).
         cursor.execute('''
-            INSERT INTO usuarios (nombres, apellidos, dni, usuario, password_hash, habilitado)
+            INSERT INTO usuarios (nombres, apellidos, dni, usuario, password, habilitado)
             VALUES (?, ?, ?, ?, ?, 1)
         ''', (perfil.nombres, perfil.apellidos, perfil.dni, perfil.usuario, perfil.password_hash))
         
@@ -57,10 +57,10 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         """
         cursor = self.conexion.cursor()
         
-        # 1. Actualizar datos en tabla central (se omite habilitado por ser update).
+        # 1. Actualizar datos en tabla central (columna física: password).
         cursor.execute('''
             UPDATE usuarios 
-            SET nombres = ?, apellidos = ?, dni = ?, usuario = ?, password_hash = ?
+            SET nombres = ?, apellidos = ?, dni = ?, usuario = ?, password = ?
             WHERE id = ?
         ''', (perfil.nombres, perfil.apellidos, perfil.dni, perfil.usuario, perfil.password_hash, perfil.id))
         
@@ -86,7 +86,7 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         """
         cursor = self.conexion.cursor()
         cursor.execute('''
-            SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password_hash, u.habilitado
+            SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password, u.habilitado
             FROM usuarios u
             LEFT JOIN usuxroles uxr ON u.id = uxr.id_usuario
             LEFT JOIN roles r ON uxr.id_rol = r.id
@@ -102,7 +102,7 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         """
         cursor = self.conexion.cursor()
         cursor.execute('''
-            SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password_hash, u.habilitado
+            SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password, u.habilitado
             FROM usuarios u
             LEFT JOIN usuxroles uxr ON u.id = uxr.id_usuario
             LEFT JOIN roles r ON uxr.id_rol = r.id
@@ -119,7 +119,7 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         """
         cursor = self.conexion.cursor()
         cursor.execute('''
-            SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password_hash, u.habilitado
+            SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password, u.habilitado
             FROM usuarios u
             JOIN usuxroles uxr ON u.id = uxr.id_usuario
             JOIN roles r ON uxr.id_rol = r.id

@@ -5,7 +5,7 @@ from src.infraestructura.persistencia.repositorio_perfiles_sql import Repositori
 from src.infraestructura.persistencia.repositorio_productos_sql import RepositorioProductosSQL
 
 # ========================================================================================
-#  PRUE बुन्देल DE INTEGRACIÓN: REPOSITORIOS SQL (TDD CICLO 2 - INFRAESTRUCTURA)
+#  PRUEBA DE INTEGRACIÓN: REPOSITORIOS SQL (TDD CICLO 2 - INFRAESTRUCTURA)
 # ========================================================================================
 #  DECISIÓN DE DISEÑO (PIRÁMIDE DE TESTING Y AISLAMIENTO):
 #
@@ -57,14 +57,14 @@ def test_guardar_perfil_ejecuta_transaccion_escalonada_3fn(conexion_sqlite_memor
         JOIN roles r ON uxr.id_rol = r.id
         WHERE uxr.id_usuario = ?
     ''', (id_generado,))
-    assert cursor.fetchone()[0] == "Gerente"
+    assert cursor.fetchone()[0] == "GERENTE"
 
 
 def test_trigger_sqlite_bloquea_borrado_fisico(conexion_sqlite_memoria):
     """
-    Garantiza que el mecanismo de Hard Delete Lock a nivel motor funciona.
-    Nadie (ni un programador inyectando SQL a mano) debería poder ejecutar 
-    un DELETE real sobre la tabla usuarios.
+     Garantiza que el mecanismo de Hard Delete Lock a nivel motor funciona.
+     Nadie (ni un programador inyectando SQL a mano) debería poder ejecutar 
+     un DELETE real sobre la tabla usuarios.
     """
     cursor = conexion_sqlite_memoria.cursor()
     
@@ -73,7 +73,7 @@ def test_trigger_sqlite_bloquea_borrado_fisico(conexion_sqlite_memoria):
     id_test = cursor.lastrowid
     
     # Intentamos ejecutar el comando prohibido. SQLite debería abortar la transacción.
-    with pytest.raises(sqlite3.DatabaseError, match="abort"):
+    with pytest.raises(sqlite3.DatabaseError, match="Violación de Seguridad Nivel 1"):
         cursor.execute("DELETE FROM usuarios WHERE id = ?", (id_test,))
 
 
@@ -86,13 +86,17 @@ def test_guardar_producto_asigna_estado_disponible_por_defecto(conexion_sqlite_m
      Verifica que al registrar un producto nuevo, el repositorio consulte/cree 
      el estado 'Disponible' y lo asocie en la tabla puente 'productoxestados'.
     """
+    cursor = conexion_sqlite_memoria.cursor()
+    # ARRANGE: Preparar semilla para satisfacer la Foreign Key (id_proveedor = 1).
+    cursor.execute("INSERT INTO usuarios (id, nombres, apellidos, dni) VALUES (1, 'Proveedor', 'Base', '000')")
+    
     repositorio = RepositorioProductosSQL(conexion_sqlite_memoria)
     
     nuevo_producto = Producto(
         codigo="TEST-PROD-01",
         descripcion="Disco Solido 1TB",
         categoria="Almacenamiento",
-        id_proveedor=1, # Asumimos que el esquema.sql crea un proveedor base o lo permite.
+        id_proveedor=1,
         precio_costo=50000.0,
         precio_venta=80000.0,
         stock_actual=15.0
@@ -101,7 +105,6 @@ def test_guardar_producto_asigna_estado_disponible_por_defecto(conexion_sqlite_m
     id_prod = repositorio.guardar(nuevo_producto)
     
     # Verificamos la asignación del estado inicial puenteando el repo.
-    cursor = conexion_sqlite_memoria.cursor()
     cursor.execute('''
         SELECT e.estado FROM productoxestados pxe
         JOIN estados e ON pxe.id_estado = e.id
@@ -110,7 +113,7 @@ def test_guardar_producto_asigna_estado_disponible_por_defecto(conexion_sqlite_m
     
     resultado = cursor.fetchone()
     assert resultado is not None
-    assert resultado[0] == "Disponible"
+    assert resultado[0] == "DISPONIBLE"
 
 
 def test_actualizar_stock_modifica_inventario_correctamente(conexion_sqlite_memoria):
@@ -118,6 +121,10 @@ def test_actualizar_stock_modifica_inventario_correctamente(conexion_sqlite_memo
      Verifica que la función atómica de descontar o sumar stock 
      impacte físicamente en la columna correspondiente.
     """
+    cursor = conexion_sqlite_memoria.cursor()
+    # ARRANGE: Preparar semilla para satisfacer la Foreign Key (id_proveedor = 1).
+    cursor.execute("INSERT INTO usuarios (id, nombres, apellidos, dni) VALUES (1, 'Proveedor', 'Base', '000')")
+    
     repositorio = RepositorioProductosSQL(conexion_sqlite_memoria)
     
     # Primero creamos un producto con stock de 10.
@@ -131,6 +138,5 @@ def test_actualizar_stock_modifica_inventario_correctamente(conexion_sqlite_memo
     repositorio.actualizar_stock(id_producto=id_prod, variacion=-3.0)
     
     # Verificamos que queden 7.
-    cursor = conexion_sqlite_memoria.cursor()
     cursor.execute("SELECT stock_actual FROM productos WHERE id = ?", (id_prod,))
     assert cursor.fetchone()[0] == 7.0

@@ -34,22 +34,30 @@ class RepositorioVentasSQL(PuertoRepositorioVentas):
         cursor = self.conexion.cursor()
         
         # 1. Ejecutamos la regla de negocio encapsulada.
-        total_calculado = factura.calcular_total_estimado()
+        # Aunque SQLite calcula el total físico en disco, ejecutamos esto para que 
+        # el Dominio valide matemáticamente los montos (ej. que no haya precios negativos).
+        factura.calcular_total_estimado()
         
         # 2. Insertamos la transacción física.
+        # -----------------------------------------------------------------------------
+        # CAMBIO APLICADO:
+        #  
+        #  - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
+        #  - Se quitó la inserción manual de la columna 'total' ya que SQLite 
+        #    la genera automáticamente (GENERATED ALWAYS AS) según el esquema.sql.
+        # -----------------------------------------------------------------------------
         cursor.execute('''
-            INSERT INTO facturas (
+            INSERT INTO facturacion (
                 id_vendedor, id_cliente, id_producto, 
-                cantidad, valor, descuento, total, habilitado
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                cantidad, valor, descuento, habilitado
+            ) VALUES (?, ?, ?, ?, ?, ?, 1)
         ''', (
             factura.id_vendedor, 
             factura.id_cliente, 
             factura.id_producto, 
             factura.cantidad, 
             factura.valor, 
-            factura.descuento, 
-            total_calculado
+            factura.descuento
         ))
         
         return cursor.lastrowid
@@ -61,4 +69,11 @@ class RepositorioVentasSQL(PuertoRepositorioVentas):
          histórico para auditoría y analítica.
         """
         cursor = self.conexion.cursor()
-        cursor.execute("UPDATE facturas SET habilitado = 0 WHERE id = ?", (id_factura,))
+        
+        # -----------------------------------------------------------------------------
+        # CAMBIO APLICADO:
+        #  
+        #  - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
+        # -----------------------------------------------------------------------------
+        
+        cursor.execute("UPDATE facturacion SET habilitado = 0 WHERE id = ?", (id_factura,))

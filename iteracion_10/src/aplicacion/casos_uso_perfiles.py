@@ -131,3 +131,17 @@ class ServicioPerfiles:
             
             # Ejecutar borrado lógico.
             self.uow.perfiles.eliminar(id_destino)
+
+
+    # ---------------------------------
+    #  MÉTODO AÑADIDO: LECTURA GENERAL
+    # ---------------------------------
+    
+    def listar_perfiles(self) -> list[PerfilUsuario]:
+        """
+         Caso de Uso: Obtener el catálogo completo de perfiles activos en el sistema
+         sin filtrar por rol. Necesario para poblar las grillas principales.
+        """
+        with self.uow:
+            # Asumimos que tu repositorio tiene un método listar_todos o equivalente.
+            return self.uow.perfiles.listar_todos()

@@ -96,3 +96,17 @@ class ServicioInventario:
                 raise ErrorEntidadNoEncontrada("El producto al que intentás sumarle stock no existe.")
                 
             self.uow.productos.actualizar_stock(id_producto, cantidad)
+
+    # -------------------------------------------------------------------------------------------
+    # CAMBIO APLICADO: LECTURA GENERAL DE INVENTARIO
+    #
+    # Se implementó el método 'listar_productos' para consultar el catálogo completo.
+    # Es vital para que las vistas de interfaz de usuario puedan poblar sus grillas (Treeviews).
+    # -------------------------------------------------------------------------------------------
+    
+    def listar_productos(self) -> list[Producto]:
+        """
+         Caso de Uso: Obtener el catálogo completo de productos activos.
+        """
+        with self.uow:
+            return self.uow.productos.listar_todos()

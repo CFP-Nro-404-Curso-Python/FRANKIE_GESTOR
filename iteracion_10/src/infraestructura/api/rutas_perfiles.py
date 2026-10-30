@@ -125,6 +125,42 @@ def crear_perfil(
 
 
 @router.get(
+    "",
+    response_model=List[EsquemaPerfilRespuesta],
+    status_code=status.HTTP_200_OK
+)
+def listar_todos_los_perfiles(
+    servicio: ServicioPerfiles = Depends(obtener_servicio_perfiles)
+):
+    """
+     Devuelve la nómina completa de perfiles activos en el sistema sin importar su rol.
+     Esencial para poblar la grilla principal de la ventana de Usuarios.
+    """
+
+    # --------------------------------------------------------------------------------
+    # CAMBIO APLICADO: LECTURA GENERAL
+    #  
+    #  Se expuso el endpoint GET raíz que consume el nuevo método 'listar_perfiles()' 
+    #  del Caso de Uso, permitiendo que el frontend recupere el catálogo completo.
+    # --------------------------------------------------------------------------------
+
+    perfiles = servicio.listar_perfiles()
+    
+    return [
+        EsquemaPerfilRespuesta(
+            id=p.id,
+            nombres=p.nombres,
+            apellidos=p.apellidos,
+            dni=p.dni,
+            rol=p.rol,
+            usuario=p.usuario,
+            habilitado=p.habilitado
+        )
+        for p in perfiles
+    ]
+
+
+@router.get(
     "/rol/{rol}",
     response_model=List[EsquemaPerfilRespuesta],
     status_code=status.HTTP_200_OK
@@ -137,7 +173,6 @@ def listar_perfiles_por_rol(
      Devuelve la nómina de perfiles activos filtrados por su rol comercial 
      (ej. 'Cliente', 'Proveedor', 'Gerente').
     """
-    # Se actualiza el nombre del método para coincidir con la Capa 2 (asumiendo que era necesario).
     perfiles = servicio.uow.perfiles.listar_por_rol(rol)
     
     return [
@@ -167,7 +202,6 @@ def obtener_perfil_por_id(
      Busca y retorna un perfil específico por su clave primaria (ID).
      Si no existe o fue dado de baja lógica, retorna HTTP 404.
     """
-    # Se actualiza el nombre del método para coincidir con la Capa 2 (asumiendo que era necesario).
     perfil = servicio.uow.perfiles.obtener_por_id(id_perfil)
     
     if not perfil:

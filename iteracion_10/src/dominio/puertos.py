@@ -65,6 +65,18 @@ class PuertoRepositorioPerfiles(ABC):
         pass
 
 
+    # ---------------------------------------------------------------------------------------
+    # CAMBIO APLICADO:
+    #  
+    # Se agregó el contrato listar_todos para soportar vistas generales sin filtrar por rol,
+    # necesario para las interfaces de usuario (Escritorio/Web).
+    # ---------------------------------------------------------------------------------------
+
+    @abstractmethod
+    def listar_todos(self) -> List[PerfilUsuario]:
+        pass
+
+
 class PuertoRepositorioProductos(ABC):
     """
      Contrato para la persistencia y gestión de inventario.
@@ -93,6 +105,17 @@ class PuertoRepositorioProductos(ABC):
     def actualizar_stock(self, id_producto: int, variacion: float) -> None:
         pass
 
+    # ----------------------------------------------------------------------------
+    # CAMBIO APLICADO:
+    #  
+    # Se agregó el contrato listar_todos para poder poblar la grilla del catálogo 
+    # completo en la vista de Inventario y en la ventana de Facturación.
+    # ----------------------------------------------------------------------------
+
+    @abstractmethod
+    def listar_todos(self) -> List[Producto]:
+        pass
+
 
 class PuertoRepositorioVentas(ABC):
     """
@@ -104,6 +127,16 @@ class PuertoRepositorioVentas(ABC):
 
     @abstractmethod
     def eliminar(self, id_factura: int) -> None:
+        pass
+
+    # -------------------------------------------------------------------------------------
+    # CAMBIO APLICADO:
+    #  
+    # Se agregó el contrato listar_todos para alimentar el módulo de Business Intelligence 
+    # (Consola BI) con el historial completo de transacciones contables.
+    # -------------------------------------------------------------------------------------
+    @abstractmethod
+    def listar_todos(self) -> List[Factura]:
         pass
 
 

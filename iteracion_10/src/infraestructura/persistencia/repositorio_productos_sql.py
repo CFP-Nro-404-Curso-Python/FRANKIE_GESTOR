@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Optional
+from typing import Optional, List
 from src.dominio.entidades import Producto
 from src.dominio.puertos import PuertoRepositorioProductos
 from src.infraestructura.persistencia.utilidades_sql import obtener_o_crear
@@ -115,6 +115,31 @@ class RepositorioProductosSQL(PuertoRepositorioProductos):
         
         fila = cursor.fetchone()
         return self._mapear_a_entidad(fila) if fila else None
+
+
+    # -----------------------------------------------------------------------------
+    # CAMBIO APLICADO:
+    #  
+    # Se implementó el método 'listar_todos' exigido por el puerto actualizado.
+    #
+    # Obtiene todos los productos activos (habilitado = 1) para poblar las grillas 
+    # de catálogo e inventario en las vistas de Escritorio y Web.
+    # -----------------------------------------------------------------------------
+    
+    def listar_todos(self) -> List[Producto]:
+        """
+         Devuelve la lista completa de todos los productos activos en el catálogo.
+        """
+        cursor = self.conexion.cursor()
+        cursor.execute('''
+            SELECT id, codigo, descripcion, categoria, id_proveedor, 
+                   precio_costo, precio_venta, stock_actual, stock_minimo, 
+                   vencimiento, habilitado
+            FROM productos
+            WHERE habilitado = 1
+        ''')
+        
+        return [self._mapear_a_entidad(fila) for fila in cursor.fetchall()]
 
     def actualizar_stock(self, id_producto: int, variacion: float) -> None:
         """

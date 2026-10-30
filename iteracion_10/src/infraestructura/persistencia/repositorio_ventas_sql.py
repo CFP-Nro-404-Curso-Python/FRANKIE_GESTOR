@@ -1,17 +1,18 @@
 import sqlite3
+from typing import List
 from src.dominio.entidades import Factura
 from src.dominio.puertos import PuertoRepositorioVentas
 
-# =================================================================================
+# ==================================================================================
 #  REPOSITORIO DE VENTAS SQL (CAPA 3 - INFRAESTRUCTURA)
-# =================================================================================
+# ==================================================================================
 #  DECISIÓN DE DISEÑO (INMUTABILIDAD Y AUDITORÍA):
 #
-#  Este repositorio se encarga de persistir las transacciones comerciales.
+#   Este repositorio se encarga de persistir las transacciones comerciales.
 #  
-#  Como una factura es un documento legal/contable, no existe un método 
-#  'modificar'. Si ocurre un error, se "anula" (soft delete) y se emite una nueva.
-# =================================================================================
+#   Como una factura es un documento legal/contable, no existe un método 
+#   'modificar'. Si ocurre un error, se "anula" (soft delete) y se emite una nueva.
+# ==================================================================================
 
 
 
@@ -39,13 +40,15 @@ class RepositorioVentasSQL(PuertoRepositorioVentas):
         factura.calcular_total_estimado()
         
         # 2. Insertamos la transacción física.
-        # -----------------------------------------------------------------------------
+
+        # ----------------------------------------------------------------------------
         # CAMBIO APLICADO:
         #  
-        #  - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
-        #  - Se quitó la inserción manual de la columna 'total' ya que SQLite 
-        #    la genera automáticamente (GENERATED ALWAYS AS) según el esquema.sql.
-        # -----------------------------------------------------------------------------
+        # - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
+        # - Se quitó la inserción manual de la columna 'total' ya que SQLite 
+        #   la genera automáticamente (GENERATED ALWAYS AS) según el esquema.sql.
+        # ----------------------------------------------------------------------------
+
         cursor.execute('''
             INSERT INTO facturacion (
                 id_vendedor, id_cliente, id_producto, 
@@ -70,10 +73,49 @@ class RepositorioVentasSQL(PuertoRepositorioVentas):
         """
         cursor = self.conexion.cursor()
         
-        # -----------------------------------------------------------------------------
+        # ----------------------------------------------------------------------------
         # CAMBIO APLICADO:
         #  
-        #  - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
-        # -----------------------------------------------------------------------------
+        # - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
+        # ----------------------------------------------------------------------------
         
         cursor.execute("UPDATE facturacion SET habilitado = 0 WHERE id = ?", (id_factura,))
+
+    # ------------------------------------------------------------------------------
+    # CAMBIO APLICADO:
+    #  
+    # Se implementó el método 'listar_todos' exigido por el puerto actualizado.
+    # Obtiene todas las facturas activas (no anuladas) para alimentar el módulo BI.
+    # ------------------------------------------------------------------------------
+    
+    def listar_todos(self) -> List[Factura]:
+        """
+         Devuelve la lista completa del historial transaccional activo.
+        """
+        cursor = self.conexion.cursor()
+        cursor.execute('''
+            SELECT id, id_vendedor, id_cliente, id_producto, 
+                   cantidad, valor, descuento, fecha, total, habilitado
+            FROM facturacion
+            WHERE habilitado = 1
+        ''')
+        
+        return [self._mapear_a_entidad(fila) for fila in cursor.fetchall()]
+
+    def _mapear_a_entidad(self, fila: tuple) -> Factura:
+        """
+         Función privada auxiliar. Transforma la tupla cruda que devuelve SQLite 
+         a nuestro objeto puro de negocio.
+        """
+        return Factura(
+            id=fila[0],
+            id_vendedor=fila[1],
+            id_cliente=fila[2],
+            id_producto=fila[3],
+            cantidad=fila[4],
+            valor=fila[5],
+            descuento=fila[6],
+            fecha=fila[7],
+            total=fila[8],
+            habilitado=fila[9]
+        )

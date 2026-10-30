@@ -1,6 +1,7 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from src.dominio.entidades import Producto
+from src.dominio.entidades import Producto, Factura
 from src.aplicacion.casos_uso_inventario import ServicioInventario
 from src.aplicacion.casos_uso_comercial import ServicioComercial
 from src.infraestructura.api.esquemas_validacion import (
@@ -64,6 +65,42 @@ def crear_producto(
         "mensaje": "Producto registrado correctamente."
     }
 
+@router.get(
+    "/api/productos",
+    response_model=List[EsquemaProductoRespuesta],
+    status_code=status.HTTP_200_OK
+)
+def listar_todos_los_productos(
+    servicio: ServicioInventario = Depends(obtener_servicio_inventario)
+):
+    """
+     Devuelve el catálogo completo de productos activos. 
+     Esencial para poblar la grilla de stock y facturación en las interfaces de usuario.
+    """
+    # ------------------------------------------------------------------------------------
+    # CAMBIO APLICADO: LECTURA GENERAL
+    #  
+    #  Se expuso el endpoint GET general que consume el nuevo método 'listar_productos()' 
+    #  del Caso de Uso de Inventario.
+    # ------------------------------------------------------------------------------------
+
+    productos = servicio.listar_productos()
+    
+    return [
+        EsquemaProductoRespuesta(
+            id=p.id,
+            codigo=p.codigo,
+            descripcion=p.descripcion,
+            categoria=p.categoria,
+            id_proveedor=p.id_proveedor,
+            precio_costo=p.precio_costo,
+            precio_venta=p.precio_venta,
+            stock_actual=p.stock_actual,
+            stock_minimo=p.stock_minimo,
+            vencimiento=p.vencimiento,
+            habilitado=p.habilitado
+        ) for p in productos
+    ]
 
 @router.get(
     "/api/productos/{id_producto}",
@@ -77,6 +114,7 @@ def obtener_producto(
     """
      Recupera los datos físicos y comerciales de un producto por su ID.
     """
+
     # ----------------------------------------------------------------------------------------
     # CAMBIO APLICADO:
     #  
@@ -120,8 +158,10 @@ def modificar_producto(
      Actualiza los datos comerciales de un producto. 
      Nota: el stock físico NO se modifica por esta vía para evitar inconsistencias.
     """
+
     # ----------------------------------------------------------------------------------
-    # CAMBIO APLICADO: 
+    # CAMBIO APLICADO:
+    #  
     #  El método 'modificar_producto' orquesta toda la búsqueda y edición internamente. 
     #  Solo necesita el id_producto y el diccionario con los campos modificados.
     # ----------------------------------------------------------------------------------
@@ -147,8 +187,10 @@ def ingresar_stock(
      Endpoint atómico y seguro para sumar mercadería al inventario 
      (ej. recepción de un envío de un proveedor).
     """
+
     # -------------------------------------------------------------------------------------
-    # CAMBIO APLICADO: 
+    # CAMBIO APLICADO:
+    #  
     #  Se ajustó el nombre del método de 'ingresar_mercaderia' a 'registrar_ingreso_stock' 
     #  para emparejar con el contrato oficial de la Capa de Aplicación.
     # -------------------------------------------------------------------------------------
@@ -210,6 +252,28 @@ def emitir_factura(
         "mensaje": "Factura emitida y stock descontado exitosamente."
     }
 
+@router.get(
+    "/api/facturas",
+    status_code=status.HTTP_200_OK
+)
+def listar_todas_las_facturas(
+    servicio: ServicioComercial = Depends(obtener_servicio_comercial)
+):
+    """
+     Devuelve el historial contable completo de comprobantes activos.
+     Vital para los reportes gerenciales de BI.
+    """
+
+    # -----------------------------------------------------------------------------------
+    # CAMBIO APLICADO: LECTURA GENERAL
+    #  
+    #  Se expuso el endpoint GET general que consume el nuevo método 'listar_facturas()' 
+    #  del Caso de Uso Comercial. No usamos un Esquema de Respuesta estricto aquí para 
+    #  dejar flexibilidad en la analítica.
+    # -----------------------------------------------------------------------------------
+    
+    facturas = servicio.listar_facturas()
+    return facturas
 
 @router.delete(
     "/api/facturas/{id_factura}",

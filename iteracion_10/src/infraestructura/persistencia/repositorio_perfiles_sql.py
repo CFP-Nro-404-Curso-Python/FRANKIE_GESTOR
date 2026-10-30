@@ -128,6 +128,28 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         
         return [self._mapear_a_entidad(fila) for fila in cursor.fetchall()]
 
+    # --------------------------------------------------------------------------------------
+    # CAMBIO APLICADO:
+    #  
+    # Se implementó el método 'listar_todos' exigido por el puerto actualizado.
+    # Obtiene todos los perfiles activos (habilitado = 1) resolviendo su rol mediante JOIN,
+    # ideal para poblar la grilla general de la interfaz de usuario.
+    # --------------------------------------------------------------------------------------
+    def listar_todos(self) -> List[PerfilUsuario]:
+        """
+         Devuelve la lista completa de todos los perfiles activos en el sistema.
+        """
+        cursor = self.conexion.cursor()
+        cursor.execute('''
+            SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password, u.habilitado
+            FROM usuarios u
+            LEFT JOIN usuxroles uxr ON u.id = uxr.id_usuario
+            LEFT JOIN roles r ON uxr.id_rol = r.id
+            WHERE u.habilitado = 1
+        ''')
+        
+        return [self._mapear_a_entidad(fila) for fila in cursor.fetchall()]
+
     def obtener_rol_por_id(self, id_perfil: int) -> Optional[str]:
         """
          Método ultra-ligero utilizado por el inyector de dependencias (RBAC) 

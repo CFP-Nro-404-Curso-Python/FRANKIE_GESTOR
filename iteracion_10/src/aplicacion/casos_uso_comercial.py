@@ -47,6 +47,7 @@ class ServicioComercial:
                 )
             
             # 3. Construimos la entidad Factura.
+
             # Nota: Congelamos el 'valor' con el precio de venta actual del producto, 
             # para que la contabilidad no se rompa si el producto aumenta mañana.
             nueva_factura = Factura(
@@ -74,10 +75,26 @@ class ServicioComercial:
          sino que debe restituir el stock al inventario.
         """
         with self.uow:
+
             # En la iteración actual, asumimos que el repositorio de ventas 
             # aplica el borrado lógico. Para restituir el stock, primero deberíamos 
             # consultar la cantidad y el id_producto de esta factura.
+
             # Como aún no implementamos el 'obtener_por_id' en ventas, aplicamos 
             # la anulación básica. En la próxima iteración, agregaremos la lectura 
             # para hacer la restitución completa.
             self.uow.ventas.eliminar(id_factura)
+
+    # ---------------------------------------------------------------------------------------
+    # CAMBIO APLICADO: LECTURA GENERAL DE FACTURACIÓN
+    #
+    # Se implementó el método 'listar_facturas' para consultar el historial completo.
+    # Es indispensable para alimentar el módulo de Business Intelligence (BI) y las grillas.
+    # ---------------------------------------------------------------------------------------
+    
+    def listar_facturas(self) -> list[Factura]:
+        """
+         Caso de Uso: Obtener el historial completo de facturas emitidas y activas.
+        """
+        with self.uow:
+            return self.uow.ventas.listar_todos()

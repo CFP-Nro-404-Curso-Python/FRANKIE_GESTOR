@@ -112,19 +112,39 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         fila = cursor.fetchone()
         return self._mapear_a_entidad(fila) if fila else None
 
+    # Mapa de traducción entre las mayúsculas físicas de SQLite y los nombres de rol del Dominio/UI.
+    _MAPA_ROLES = {
+        "ADMINISTRADOR": "Administrador",
+        "GERENTE": "Gerente",
+        "EMPLEADO - VENTAS": "Empleado - Ventas",
+        "EMPLEADO - COMPRAS": "Empleado - Compras",
+        "EMPLEADO": "Empleado - Ventas",
+        "PROVEEDOR": "Proveedor",
+        "CLIENTE": "Cliente",
+    }
+
+    def _normalizar_rol(self, rol_db: Optional[str]) -> Optional[str]:
+        """Convierte el rol almacenado en mayúsculas en SQLite al formato esperado por el Dominio y la UI."""
+        if not rol_db:
+            return None
+        return self._MAPA_ROLES.get(str(rol_db).strip().upper(), rol_db)
+
     def listar_por_rol(self, rol: str) -> List[PerfilUsuario]:
         """
          Devuelve una lista de perfiles que coincidan con un rol específico 
          (ej. todos los Clientes, o todos los Empleados de Ventas).
         """
         cursor = self.conexion.cursor()
+
+        # CAMBIO APLICADO: Compara en mayúsculas e incluye 'EMPLEADO' (semilla BI) dentro de 'Empleado - Ventas'.
         cursor.execute('''
             SELECT u.id, u.nombres, u.apellidos, u.dni, r.rol, u.usuario, u.password, u.habilitado
             FROM usuarios u
             JOIN usuxroles uxr ON u.id = uxr.id_usuario
             JOIN roles r ON uxr.id_rol = r.id
-            WHERE r.rol = ? AND u.habilitado = 1
-        ''', (rol,))
+            WHERE (UPPER(r.rol) = UPPER(?) OR (UPPER(?) = 'EMPLEADO - VENTAS' AND UPPER(r.rol) = 'EMPLEADO'))
+              AND u.habilitado = 1
+        ''', (rol, rol))
         
         return [self._mapear_a_entidad(fila) for fila in cursor.fetchall()]
 
@@ -164,7 +184,7 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
         ''', (id_perfil,))
         
         resultado = cursor.fetchone()
-        return resultado[0] if resultado else None
+        return self._normalizar_rol(resultado[0]) if resultado else None
 
     def _mapear_a_entidad(self, fila: tuple) -> PerfilUsuario:
         """
@@ -176,7 +196,7 @@ class RepositorioPerfilesSQL(PuertoRepositorioPerfiles):
             nombres=fila[1],
             apellidos=fila[2],
             dni=fila[3],
-            rol=fila[4],
+            rol=self._normalizar_rol(fila[4]),
             usuario=fila[5],
             password_hash=fila[6],
             habilitado=fila[7]

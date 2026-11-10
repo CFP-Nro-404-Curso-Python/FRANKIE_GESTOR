@@ -6,11 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 # CAMBIO APLICADO: 
 #  Se agregó ErrorCredencialesInvalidas a la importación desde src.dominio.excepciones
 # -------------------------------------------------------------------------------------
-
+import sqlite3
 from src.dominio.excepciones import (
     ErrorJerarquiaRBAC, 
     ErrorStockInsuficiente, 
-    ErrorCredencialesInvalidas
+    ErrorCredencialesInvalidas,
+    ErrorEntidadNoEncontrada
 )
 from src.infraestructura.api.rutas_perfiles import router as router_perfiles
 from src.infraestructura.api.rutas_operaciones import router as router_operaciones
@@ -114,4 +115,19 @@ async def manejador_value_error(request: Request, exc: ValueError):
     return JSONResponse(
         status_code=400,
         content={"detalle": str(exc)}
+    )
+
+# CAMBIO APLICADO: Traduce entidades no encontradas a HTTP 404 y errores/triggers de SQLite a HTTP 400.
+@app.exception_handler(ErrorEntidadNoEncontrada)
+async def manejador_no_encontrado(request: Request, exc: ErrorEntidadNoEncontrada):
+    return JSONResponse(
+        status_code=404,
+        content={"detalle": str(exc)}
+    )
+
+@app.exception_handler(sqlite3.Error)
+async def manejador_sqlite_error(request: Request, exc: sqlite3.Error):
+    return JSONResponse(
+        status_code=400,
+        content={"detalle": f"Operación bloqueada por la Base de Datos: {str(exc)}"}
     )

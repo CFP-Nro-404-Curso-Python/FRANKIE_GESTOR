@@ -99,21 +99,34 @@ def sembrar_datos():
 
 
         # 4. PREPARAR ACTORES PARA LA FACTURACIÓN (VENDEDOR Y CLIENTE).
-        cursor.execute("INSERT OR IGNORE INTO roles (rol) VALUES ('Empleado')")
-        cursor.execute("SELECT id FROM roles WHERE rol = 'Empleado'")
-        id_rol_emp = cursor.fetchone()[0]
-        
-        cursor.execute("INSERT OR IGNORE INTO roles (rol) VALUES ('Cliente')")
-        cursor.execute("SELECT id FROM roles WHERE rol = 'Cliente'")
-        id_rol_cli = cursor.fetchone()[0]
+        # CAMBIO APLICADO: Se usa el rol oficial 'Empleado - Ventas' y hash Bcrypt para 'vendedor_bi'.
+        import bcrypt
+        cursor.execute("SELECT id FROM roles WHERE rol = 'Empleado - Ventas' COLLATE NOCASE")
+        res_emp = cursor.fetchone()
+        if not res_emp:
+            cursor.execute("INSERT INTO roles (rol) VALUES ('Empleado - Ventas')")
+            id_rol_emp = cursor.lastrowid
+        else:
+            id_rol_emp = res_emp[0]
+
+        cursor.execute("SELECT id FROM roles WHERE rol = 'Cliente' COLLATE NOCASE")
+        res_cli = cursor.fetchone()
+        if not res_cli:
+            cursor.execute("INSERT INTO roles (rol) VALUES ('Cliente')")
+            id_rol_cli = cursor.lastrowid
+        else:
+            id_rol_cli = res_cli[0]
+
+        hash_vendedor = bcrypt.hashpw("123".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
         # Vendedor (ID 888).
         cursor.execute('''
-            INSERT OR IGNORE INTO usuarios (id, nombres, apellidos, dni, usuario, password, habilitado)
-            VALUES (888, 'Vendedor', 'BI', '88888888', 'vendedor_bi', '123', 1)
-        ''')
-        cursor.execute("INSERT OR IGNORE INTO usuxroles (id_usuario, id_rol) VALUES (888, ?)", (id_rol_emp,))
-
+            INSERT OR REPLACE INTO usuarios (id, nombres, apellidos, dni, usuario, password, habilitado)
+            VALUES (888, 'Vendedor', 'BI', '88888888', 'vendedor_bi', ?, 1)
+        ''', (hash_vendedor,))
+        cursor.execute("DELETE FROM usuxroles WHERE id_usuario = 888")
+        cursor.execute("INSERT INTO usuxroles (id_usuario, id_rol) VALUES (888, ?)", (id_rol_emp,))
+        
         # Cliente (ID 777).
         cursor.execute('''
             INSERT OR IGNORE INTO usuarios (id, nombres, apellidos, dni, usuario, password, habilitado)

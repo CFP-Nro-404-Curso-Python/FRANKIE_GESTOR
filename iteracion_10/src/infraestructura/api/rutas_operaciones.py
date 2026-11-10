@@ -122,27 +122,30 @@ def obtener_producto(
     #  pueden pasar directamente por la Unidad de Trabajo inyectada en el servicio.
     # ----------------------------------------------------------------------------------------
 
-    producto = servicio.uow.productos.obtener_por_id(id_producto)
-    
-    if not producto:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró un producto activo con ID {id_producto}."
-        )
+    # CAMBIO APLICADO: Se abre el contexto 'with servicio.uow:' para que GestorSQLite 
+    # conecte la base e instancie el repositorio 'productos'.
+    with servicio.uow:
+        producto = servicio.uow.productos.obtener_por_id(id_producto)
         
-    return EsquemaProductoRespuesta(
-        id=producto.id,
-        codigo=producto.codigo,
-        descripcion=producto.descripcion,
-        categoria=producto.categoria,
-        id_proveedor=producto.id_proveedor,
-        precio_costo=producto.precio_costo,
-        precio_venta=producto.precio_venta,
-        stock_actual=producto.stock_actual,
-        stock_minimo=producto.stock_minimo,
-        vencimiento=producto.vencimiento,
-        habilitado=producto.habilitado
-    )
+        if not producto:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontró un producto activo con ID {id_producto}."
+            )
+            
+        return EsquemaProductoRespuesta(
+            id=producto.id,
+            codigo=producto.codigo,
+            descripcion=producto.descripcion,
+            categoria=producto.categoria,
+            id_proveedor=producto.id_proveedor,
+            precio_costo=producto.precio_costo,
+            precio_venta=producto.precio_venta,
+            stock_actual=producto.stock_actual,
+            stock_minimo=producto.stock_minimo,
+            vencimiento=producto.vencimiento,
+            habilitado=producto.habilitado
+        )
 
 
 @router.put(

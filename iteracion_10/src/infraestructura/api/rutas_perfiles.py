@@ -173,20 +173,24 @@ def listar_perfiles_por_rol(
      Devuelve la nómina de perfiles activos filtrados por su rol comercial 
      (ej. 'Cliente', 'Proveedor', 'Gerente').
     """
-    perfiles = servicio.uow.perfiles.listar_por_rol(rol)
     
-    return [
-        EsquemaPerfilRespuesta(
-            id=p.id,
-            nombres=p.nombres,
-            apellidos=p.apellidos,
-            dni=p.dni,
-            rol=p.rol,
-            usuario=p.usuario,
-            habilitado=p.habilitado
-        )
-        for p in perfiles
-    ]
+    # CAMBIO APLICADO: Se abre el contexto 'with servicio.uow:' para que GestorSQLite 
+    # inicialice la conexión y el repositorio 'perfiles' antes de consultar.
+    with servicio.uow:
+        perfiles = servicio.uow.perfiles.listar_por_rol(rol)
+        
+        return [
+            EsquemaPerfilRespuesta(
+                id=p.id,
+                nombres=p.nombres,
+                apellidos=p.apellidos,
+                dni=p.dni,
+                rol=p.rol,
+                usuario=p.usuario,
+                habilitado=p.habilitado
+            )
+            for p in perfiles
+        ]
 
 
 @router.get(
@@ -202,23 +206,27 @@ def obtener_perfil_por_id(
      Busca y retorna un perfil específico por su clave primaria (ID).
      Si no existe o fue dado de baja lógica, retorna HTTP 404.
     """
-    perfil = servicio.uow.perfiles.obtener_por_id(id_perfil)
-    
-    if not perfil:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"No se encontró un perfil activo con ID {id_perfil}."
-        )
+
+    # CAMBIO APLICADO: Se abre el contexto 'with servicio.uow:' para instanciar 
+    # el repositorio antes de buscar por ID.
+    with servicio.uow:
+        perfil = servicio.uow.perfiles.obtener_por_id(id_perfil)
         
-    return EsquemaPerfilRespuesta(
-        id=perfil.id,
-        nombres=perfil.nombres,
-        apellidos=perfil.apellidos,
-        dni=perfil.dni,
-        rol=perfil.rol,
-        usuario=perfil.usuario,
-        habilitado=perfil.habilitado
-    )
+        if not perfil:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No se encontró un perfil activo con ID {id_perfil}."
+            )
+            
+        return EsquemaPerfilRespuesta(
+            id=perfil.id,
+            nombres=perfil.nombres,
+            apellidos=perfil.apellidos,
+            dni=perfil.dni,
+            rol=perfil.rol,
+            usuario=perfil.usuario,
+            habilitado=perfil.habilitado
+        )
 
 
 @router.put(

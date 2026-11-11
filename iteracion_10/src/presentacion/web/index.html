@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <!-- Configuración crítica para adaptación móvil táctil sin zoom forzado -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+        <title>FRANKIE GESTOR - Sistema de Gestión Comercial</title>
+        <link rel="stylesheet" href="estilos.css">
+    </head>
+
+    <body>
+
+
+
+        <!-- ============================================================ -->
+        <!--  BARRA SUPERIOR DE NAVEGACIÓN (VISIBLE TRAS INICIAR SESIÓN)  -->
+        <!-- ============================================================ -->
+
+        <header id="barra-superior" class="barra-superior oculto">
+            <div class="barra-contenedor">
+                <div class="barra-marca">
+                    <span class="icono-marca">📦</span>
+                    <div>
+                        <h1 class="titulo-app">FRANKIE GESTOR</h1>
+                        <p id="info-operador-activo" class="subtitulo-operador">Operador: -</p>
+                    </div>
+                </div>
+                <div class="barra-acciones">
+                    <span id="badge-servidor" class="badge-red">API Online</span>
+                    <button type="button" id="btn-volver-panel-top" class="btn btn-gris btn-sm oculto" onclick="navegarA('vista-panel')">
+                        ⬅ Panel Principal
+                    </button>
+                </div>
+            </div>
+        </header>
+
+
+
+        <!-- =============================================================== -->
+        <!--  CUADRO DE DIÁLOGO MODAL (EQUIVALENTE A MESSAGEBOX DE TKINTER)  -->
+        <!-- =============================================================== -->
+
+        <div id="modal-alerta" class="modal-fondo oculto" role="dialog" aria-modal="true">
+            <div class="modal-caja">
+                <div id="modal-cabecera" class="modal-cabecera">
+                    <h3 id="modal-titulo">Aviso del Sistema</h3>
+                </div>
+                <div class="modal-cuerpo">
+                    <p id="modal-mensaje">Mensaje...</p>
+                </div>
+                <div class="modal-pie">
+                    <button type="button" id="btn-cerrar-modal" class="btn btn-azul" onclick="cerrarAlerta()">Aceptar</button>
+                </div>
+            </div>
+        </div>
+
+
+
+        <!-- ====================================== -->
+        <!--  CONTENEDOR PRINCIPAL DE VISTAS (SPA)  -->
+        <!-- ====================================== -->
+
+        <main class="contenedor-principal">
+
+
+
+            <!-- ======================================= -->
+            <!--  1. VISTA DE LOGIN (ACCESO AL SISTEMA)  -->
+            <!-- ======================================= -->
+
+            <section id="vista-login" class="vista-app activa">
+                <div class="tarjeta-login">
+                    <h2 class="titulo-login">SISTEMA DE GESTIÓN</h2>
+                    <p class="subtitulo-login">Acceso Multi-Dispositivo en Red Local</p>
+
+                    <form id="form-login" onsubmit="validarIngreso(event)">
+                        <div class="grupo-campo">
+                            <label for="login-usuario">Usuario:</label>
+                            <input type="text" id="login-usuario" autocomplete="username" placeholder="Ej: admin" required>
+                        </div>
+
+                        <div class="grupo-campo">
+                            <label for="login-password">Contraseña:</label>
+                            <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••" required>
+                        </div>
+
+                        <button type="submit" id="btn-login-ingresar" class="btn btn-verde btn-bloque">
+                            Ingresar al Sistema
+                        </button>
+                    </form>
+
+                    <p id="login-intentos-info" class="texto-estado-login">Intentos disponibles: 3</p>
+                </div>
+            </section>
+
+
+
+            <!-- ============================================================ -->
+            <!--  2. VISTA PANEL DE CONTROL (MENÚ PRINCIPAL CON MATRIZ RBAC)  -->
+            <!-- ============================================================ -->
+
+            <section id="vista-panel" class="vista-app">
+                <div class="cabecera-panel">
+                    <h2 id="panel-saludo" class="titulo-bienvenida">BIENVENIDO/A</h2>
+                    <p id="panel-rol" class="subtitulo-rol">Rol Activo: -</p>
+                </div>
+
+                <!-- Grilla de botones idéntica en estructura y colores a panel_control.py -->
+                <div class="grilla-panel">
+
+                    <!-- Fila 1: Operaciones de Ventas -->
+                    <button type="button" id="btn-nav-clientes" class="btn-panel btn-azul" onclick="abrirModulo('vista-clientes')">
+                        Gestión de Clientes
+                    </button>
+                    <button type="button" id="btn-nav-facturacion" class="btn-panel btn-azul" onclick="abrirModulo('vista-facturacion')">
+                        Facturación
+                    </button>
+
+                    <!-- Fila 2: Operaciones de Compras -->
+                    <button type="button" id="btn-nav-proveedores" class="btn-panel btn-azul" onclick="abrirModulo('vista-proveedores')">
+                        Gestión de Proveedores
+                    </button>
+                    <button type="button" id="btn-nav-stock" class="btn-panel btn-azul" onclick="abrirModulo('vista-stock')">
+                        Control de Stock
+                    </button>
+
+                    <!-- Fila 3: Recursos Humanos y Accesos -->
+                    <button type="button" id="btn-nav-empleados" class="btn-panel btn-naranja" onclick="abrirModulo('vista-empleados')">
+                        Recursos Humanos
+                    </button>
+                    <button type="button" id="btn-nav-usuarios" class="btn-panel btn-violeta" onclick="abrirModulo('vista-usuarios')">
+                        Gestión de Usuarios
+                    </button>
+
+                    <!-- Fila 4: Herramientas ROOT -->
+                    <button type="button" id="btn-nav-consola" class="btn-panel btn-gris-azulado" onclick="abrirModulo('vista-consola')">
+                        Consola SQL (Auditoría)
+                    </button>
+                    <button type="button" id="btn-nav-backup" class="btn-panel btn-pizarra" onclick="generarBackupWeb()">
+                        Generar Backup DB
+                    </button>
+
+                    <!-- Fila 5: Inteligencia de Negocios (Ancho completo) -->
+                    <button type="button" id="btn-nav-analitica" class="btn-panel btn-teal btn-ancho-completo" onclick="abrirModulo('vista-analitica')">
+                        Analítica de Ventas (Tablero BI)
+                    </button>
+                </div>
+
+                <div class="pie-panel">
+                    <button type="button" id="btn-cerrar-sesion" class="btn btn-rojo" onclick="cerrarSesion()">
+                        Cerrar Sesión
+                    </button>
+                </div>
+            </section>
+
+
+
+            <!-- ============================== -->
+            <!--  3. VISTA GESTIÓN DE USUARIOS  -->
+            <!-- ============================== -->
+
+            <section id="vista-usuarios" class="vista-app">
+                <div class="cabecera-modulo">
+                    <h2>GESTIÓN DE USUARIOS</h2>
+                    <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                </div>
+
+                <input type="hidden" id="usu-id-seleccionado">
+
+                <div class="tarjeta-formulario">
+                    <div class="grilla-formulario">
+                        <div class="grupo-campo">
+                            <label for="usu-nombres">Nombres:</label>
+                            <input type="text" id="usu-nombres" placeholder="Nombres del usuario">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="usu-apellidos">Apellidos:</label>
+                            <input type="text" id="usu-apellidos" placeholder="Apellidos del usuario">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="usu-usuario">Usuario (Login):</label>
+                            <input type="text" id="usu-usuario" placeholder="Nombre de cuenta">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="usu-password">Contraseña:</label>
+                            <input type="password" id="usu-password" placeholder="Dejar vacío al editar para no cambiar">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="usu-rol">Rol Asignado:</label>
+                            <select id="usu-rol"></select>
+                        </div>
+                    </div>
+
+                    <div class="barra-botones-abm">
+                        <button type="button" id="btn-usu-guardar" class="btn btn-verde" onclick="guardarUsuario()">Guardar</button>
+                        <button type="button" id="btn-usu-modificar" class="btn btn-azul" onclick="modificarUsuario()">Modificar</button>
+                        <button type="button" id="btn-usu-eliminar" class="btn btn-rojo" onclick="eliminarUsuario()">Eliminar</button>
+                        <button type="button" id="btn-usu-limpiar" class="btn btn-gris" onclick="limpiarFormularioUsuarios()">Limpiar</button>
+                    </div>
+                </div>
+
+                <div class="contenedor-tabla">
+                    <p class="ayuda-tabla">Tocá una fila para cargar sus datos en el formulario.</p>
+                    <div class="scroll-tabla">
+                        <table id="tabla-usuarios" class="tabla-datos">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Usuario</th>
+                                    <th>Rol del Sistema</th>
+                                    <th>Nombres</th>
+                                    <th>Apellidos</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- ====================================== -->
+            <!--  4. VISTA FORMULARIO EMPLEADOS (RRHH)  -->
+            <!-- ====================================== -->
+
+            <section id="vista-empleados" class="vista-app">
+                <div class="cabecera-modulo">
+                    <h2>FORMULARIO EMPLEADOS (RRHH)</h2>
+                    <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                </div>
+
+                <input type="hidden" id="emp-id-seleccionado">
+
+                <div class="tarjeta-formulario">
+                    <div class="grilla-formulario">
+                        <div class="grupo-campo">
+                            <label for="emp-nombres">Nombres:</label>
+                            <input type="text" id="emp-nombres">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-apellidos">Apellidos:</label>
+                            <input type="text" id="emp-apellidos">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-dni">DNI:</label>
+                            <input type="text" id="emp-dni">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-telefono">Teléfono:</label>
+                            <input type="text" id="emp-telefono">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-email">Email:</label>
+                            <input type="email" id="emp-email">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-direccion">Dirección:</label>
+                            <input type="text" id="emp-direccion">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-ciudad">Ciudad:</label>
+                            <input type="text" id="emp-ciudad">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-provincia">Provincia:</label>
+                            <input type="text" id="emp-provincia">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-cp">Cód. Postal:</label>
+                            <input type="text" id="emp-cp">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="emp-rol">Rol Organizacional:</label>
+                            <select id="emp-rol">
+                                <option value="">Seleccione un rol...</option>
+                                <option value="Administrador">Administrador</option>
+                                <option value="Gerente">Gerente</option>
+                                <option value="Empleado - Ventas">Empleado - Ventas</option>
+                                <option value="Empleado - Compras">Empleado - Compras</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="barra-botones-abm">
+                        <button type="button" class="btn btn-verde" onclick="guardarEmpleado()">Guardar Perfil</button>
+                        <button type="button" class="btn btn-azul" onclick="modificarEmpleado()">Modificar Perfil</button>
+                        <button type="button" class="btn btn-rojo" onclick="eliminarEmpleado()">Eliminar Perfil</button>
+                        <button type="button" class="btn btn-gris" onclick="limpiarFormularioEmpleados()">Limpiar</button>
+                    </div>
+                </div>
+
+                <div class="contenedor-tabla">
+                    <p class="ayuda-tabla">Tocá un empleado de la nómina para editarlo o darlo de baja.</p>
+                    <div class="scroll-tabla">
+                        <table id="tabla-empleados" class="tabla-datos">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombres</th>
+                                    <th>Apellidos</th>
+                                    <th>DNI</th>
+                                    <th>Teléfono</th>
+                                    <th>Email</th>
+                                    <th>Dirección</th>
+                                    <th>Ciudad</th>
+                                    <th>Provincia</th>
+                                    <th>CP</th>
+                                    <th>Rol</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- ============================== -->
+            <!--  5. VISTA FORMULARIO CLIENTES  -->
+            <!-- ============================== -->
+
+            <section id="vista-clientes" class="vista-app">
+                <div class="cabecera-modulo">
+                    <h2>FORMULARIO CLIENTES</h2>
+                    <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                </div>
+
+                <input type="hidden" id="cli-id-seleccionado">
+
+                <div class="tarjeta-formulario">
+                    <div class="grilla-formulario">
+                        <div class="grupo-campo">
+                            <label for="cli-nombres">Nombres:</label>
+                            <input type="text" id="cli-nombres">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-apellidos">Apellidos:</label>
+                            <input type="text" id="cli-apellidos">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-dni">DNI:</label>
+                            <input type="text" id="cli-dni">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-telefono">Teléfono:</label>
+                            <input type="text" id="cli-telefono">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-email">Email:</label>
+                            <input type="email" id="cli-email">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-direccion">Dirección:</label>
+                            <input type="text" id="cli-direccion">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-ciudad">Ciudad:</label>
+                            <input type="text" id="cli-ciudad">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-provincia">Provincia:</label>
+                            <input type="text" id="cli-provincia">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="cli-cp">Código Postal:</label>
+                            <input type="text" id="cli-cp">
+                        </div>
+                    </div>
+
+                    <div class="barra-botones-abm">
+                        <button type="button" class="btn btn-verde" onclick="guardarCliente()">Guardar Cliente</button>
+                        <button type="button" class="btn btn-azul" onclick="modificarCliente()">Modificar Cliente</button>
+                        <button type="button" class="btn btn-rojo" onclick="eliminarCliente()">Eliminar Cliente</button>
+                        <button type="button" class="btn btn-gris" onclick="limpiarFormularioClientes()">Limpiar</button>
+                    </div>
+                </div>
+
+                <div class="contenedor-tabla">
+                    <p class="ayuda-tabla">Tocá un cliente en la tabla para cargarlo en el formulario.</p>
+                    <div class="scroll-tabla">
+                        <table id="tabla-clientes" class="tabla-datos">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombres</th>
+                                    <th>Apellidos</th>
+                                    <th>DNI</th>
+                                    <th>Teléfono</th>
+                                    <th>Email</th>
+                                    <th>Dirección</th>
+                                    <th>Ciudad</th>
+                                    <th>Provincia</th>
+                                    <th>Cód. Postal</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- ================================= -->
+            <!--  6. VISTA FORMULARIO PROVEEDORES  -->
+            <!-- ================================= -->
+
+            <section id="vista-proveedores" class="vista-app">
+                <div class="cabecera-modulo">
+                    <h2>FORMULARIO PROVEEDORES</h2>
+                    <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                </div>
+
+                <input type="hidden" id="prov-id-seleccionado">
+
+                <div class="tarjeta-formulario">
+                    <div class="grilla-formulario">
+                        <div class="grupo-campo">
+                            <label for="prov-razon-social">Razón Social:</label>
+                            <input type="text" id="prov-razon-social">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-cuit">CUIT:</label>
+                            <input type="text" id="prov-cuit">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-telefono">Teléfono:</label>
+                            <input type="text" id="prov-telefono">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-email">Email:</label>
+                            <input type="email" id="prov-email">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-direccion">Dirección:</label>
+                            <input type="text" id="prov-direccion">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-ciudad">Ciudad:</label>
+                            <input type="text" id="prov-ciudad">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-provincia">Provincia:</label>
+                            <input type="text" id="prov-provincia">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-cp">Código Postal:</label>
+                            <input type="text" id="prov-cp">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="prov-contacto">Contacto (Rep.):</label>
+                            <input type="text" id="prov-contacto">
+                        </div>
+                    </div>
+
+                    <div class="barra-botones-abm">
+                        <button type="button" class="btn btn-verde" onclick="guardarProveedor()">Guardar Proveedor</button>
+                        <button type="button" class="btn btn-azul" onclick="modificarProveedor()">Modificar Proveedor</button>
+                        <button type="button" class="btn btn-rojo" onclick="eliminarProveedor()">Eliminar Proveedor</button>
+                        <button type="button" class="btn btn-gris" onclick="limpiarFormularioProveedores()">Limpiar</button>
+                    </div>
+                </div>
+
+                <div class="contenedor-tabla">
+                    <p class="ayuda-tabla">Tocá un proveedor en la tabla para editar sus datos.</p>
+                    <div class="scroll-tabla">
+                        <table id="tabla-proveedores" class="tabla-datos">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Razón Social</th>
+                                    <th>CUIT</th>
+                                    <th>Teléfono</th>
+                                    <th>Email</th>
+                                    <th>Dirección</th>
+                                    <th>Ciudad</th>
+                                    <th>Provincia</th>
+                                    <th>Cód. Postal</th>
+                                    <th>Contacto</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- ======================================== -->
+            <!--  7. VISTA FORMULARIO STOCK E INVENTARIO  -->
+            <!-- ======================================== -->
+
+            <section id="vista-stock" class="vista-app">
+                <div class="cabecera-modulo">
+                    <h2>FORMULARIO STOCK E INVENTARIO</h2>
+                    <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                </div>
+
+                <input type="hidden" id="stk-id-seleccionado">
+
+                <div class="tarjeta-formulario">
+                    <div class="grilla-formulario">
+                        <div class="grupo-campo">
+                            <label for="stk-codigo">Código:</label>
+                            <input type="text" id="stk-codigo" placeholder="Ej: PROD-0001">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-descripcion">Descripción:</label>
+                            <input type="text" id="stk-descripcion">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-categoria">Categoría:</label>
+                            <input type="text" id="stk-categoria">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-proveedor">Proveedor:</label>
+                            <select id="stk-proveedor"></select>
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-actual">Stock Actual:</label>
+                            <input type="number" step="any" id="stk-actual" placeholder="0">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-minimo">Stock Mínimo:</label>
+                            <input type="number" step="any" id="stk-minimo" placeholder="0">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-costo">Precio Costo ($):</label>
+                            <input type="number" step="0.01" id="stk-costo" placeholder="0.00">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-venta">Precio Venta ($):</label>
+                            <input type="number" step="0.01" id="stk-venta" placeholder="0.00">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-ubicacion">Ubicación:</label>
+                            <input type="text" id="stk-ubicacion" placeholder="Ej: Depósito A">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="stk-vencimiento">Vencimiento:</label>
+                            <input type="text" id="stk-vencimiento" placeholder="S/D">
+                        </div>
+                    </div>
+
+                    <div class="barra-botones-abm">
+                        <button type="button" class="btn btn-verde" onclick="guardarProducto()">Guardar Producto</button>
+                        <button type="button" class="btn btn-azul" onclick="modificarProducto()">Modificar Producto</button>
+                        <button type="button" class="btn btn-rojo" onclick="eliminarProducto()">Eliminar Producto</button>
+                        <button type="button" class="btn btn-gris" onclick="limpiarFormularioStock()">Limpiar</button>
+                    </div>
+                </div>
+
+                <div class="contenedor-tabla">
+                    <p class="ayuda-tabla">Tocá un producto para cargarlo o ajustar su stock.</p>
+                    <div class="scroll-tabla">
+                        <table id="tabla-stock" class="tabla-datos">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Código</th>
+                                    <th>Descripción</th>
+                                    <th>Categoría</th>
+                                    <th>Proveedor</th>
+                                    <th>Stock Actual</th>
+                                    <th>Stock Mínimo</th>
+                                    <th>Precio Costo</th>
+                                    <th>Precio Venta</th>
+                                    <th>Ubicación</th>
+                                    <th>Vencimiento</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- ================================= -->
+            <!--  8. VISTA FORMULARIO FACTURACIÓN  -->
+            <!-- ================================= -->
+
+            <section id="vista-facturacion" class="vista-app">
+                <div class="cabecera-modulo">
+                    <h2>FORMULARIO FACTURACIÓN</h2>
+                    <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                </div>
+
+                <input type="hidden" id="fac-id-seleccionado">
+
+                <div class="tarjeta-formulario">
+                    <div class="grilla-formulario">
+                        <div class="grupo-campo">
+                            <label for="fac-vendedor">Datos del Vendedor:</label>
+                            <select id="fac-vendedor"></select>
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="fac-cliente">Datos del Cliente:</label>
+                            <select id="fac-cliente"></select>
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="fac-producto">Producto:</label>
+                            <select id="fac-producto" onchange="autocompletarPrecioFactura()"></select>
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="fac-cantidad">Cantidad:</label>
+                            <input type="number" step="any" id="fac-cantidad" placeholder="1">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="fac-valor">Valor en $:</label>
+                            <input type="number" step="0.01" id="fac-valor" readonly placeholder="0.00">
+                        </div>
+                        <div class="grupo-campo">
+                            <label for="fac-descuento">Descuento en %:</label>
+                            <input type="number" step="0.1" id="fac-descuento" value="0" min="0" max="100">
+                        </div>
+                    </div>
+
+                    <div class="barra-botones-abm">
+                        <button type="button" class="btn btn-verde" onclick="guardarFactura()">Guardar Facturación</button>
+                        <button type="button" class="btn btn-azul" onclick="modificarFactura()">Modificar Facturación</button>
+                        <button type="button" class="btn btn-rojo" onclick="eliminarFactura()">Eliminar Facturación</button>
+                        <button type="button" class="btn btn-gris" onclick="limpiarFormularioFacturacion()">Limpiar</button>
+                    </div>
+                </div>
+
+                <div class="contenedor-tabla">
+                    <div class="scroll-tabla">
+                        <table id="tabla-facturacion" class="tabla-datos">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Producto</th>
+                                    <th>Cantidad</th>
+                                    <th>Valor en $</th>
+                                    <th>Descuento en %</th>
+                                    <th>Total en $</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Resumen de Totales y Descuento Global -->
+                <div class="tarjeta-totales-factura">
+                    <h3 id="fac-total-general" class="texto-total-factura">TOTAL FACTURA: $ 0.00</h3>
+
+                    <div class="bloque-descuento-global">
+                        <h4>APLICAR DESCUENTO GLOBAL</h4>
+                        <div class="fila-descuento-global">
+                            <label for="fac-descuento-global">Descuento Global en %:</label>
+                            <input type="number" step="0.1" id="fac-descuento-global" placeholder="0" min="0" max="100">
+                            <button type="button" class="btn btn-naranja" onclick="calcularDescuentoGlobal()">
+                                Calcular Descuento Final
+                            </button>
+                        </div>
+                        <p id="fac-total-con-descuento" class="texto-resultado-descuento">TOTAL CON DESCUENTO: $ 0.00</p>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- ================================================= -->
+            <!--  9. VISTA CONSOLA SQL - AUDITORÍA (SOLO LECTURA)  -->
+            <!-- ================================================= -->
+
+            <section id="vista-consola" class="vista-app">
+                <div class="cabecera-modulo">
+                    <h2>CONSOLA SQL - AUDITORÍA (SOLO LECTURA)</h2>
+                    <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                </div>
+
+                <div class="tarjeta-formulario">
+                    <label for="sql-query" class="etiqueta-negrita">Ingresá tu sentencia SQL (SELECT):</label>
+
+                    <!-- Botones rápidos de ayuda para uso cómodo desde pantallas táctiles -->
+                    <div class="chips-sql">
+                        <button type="button" class="chip" onclick="cargarEjemploSQL('SELECT * FROM usuarios')">SELECT * FROM usuarios</button>
+                        <button type="button" class="chip" onclick="cargarEjemploSQL('SELECT * FROM productos LIMIT 20')">SELECT * FROM productos</button>
+                        <button type="button" class="chip" onclick="cargarEjemploSQL('SELECT * FROM facturacion LIMIT 20')">SELECT * FROM facturacion</button>
+                    </div>
+
+                    <textarea id="sql-query" rows="5" class="consola-textarea" placeholder="SELECT * FROM usuarios WHERE habilitado = 1;"></textarea>
+
+                    <div class="barra-botones-abm">
+                        <button type="button" id="btn-sql-ejecutar" class="btn btn-verde" onclick="ejecutarConsultaSQL()">
+                            Ejecutar Consulta
+                        </button>
+                        <button type="button" id="btn-sql-limpiar" class="btn btn-gris" onclick="limpiarConsolaSQL()">
+                            Limpiar Consola
+                        </button>
+                    </div>
+
+                    <p id="sql-estado" class="estado-sql">Estado: Esperando consulta...</p>
+                </div>
+
+                <div class="contenedor-tabla">
+                    <div class="scroll-tabla">
+                        <table id="tabla-sql" class="tabla-datos">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- =================================================== -->
+            <!--  10. VISTA ANALÍTICA DE VENTAS (TABLERO BI - OLAP)  -->
+            <!-- =================================================== -->
+
+            <section id="vista-analitica" class="vista-app">
+                <div class="cabecera-modulo">
+                    <div>
+                        <h2>TABLERO DE CONTROL - OLAP</h2>
+                        <p id="bi-subtitulo-estrella" class="subtitulo-bi">Análisis estadístico en tiempo real</p>
+                    </div>
+                    <div class="acciones-cabecera-bi">
+                        <button type="button" id="btn-bi-actualizar" class="btn btn-teal" onclick="cargarDatosAnalitica()">
+                            🔄 Actualizar Análisis
+                        </button>
+                        <button type="button" class="btn btn-gris" onclick="navegarA('vista-panel')">Cerrar Ventana</button>
+                    </div>
+                </div>
+
+                <!-- Tarjetas de Indicadores Clave (KPIs) --> 
+                <div class="grilla-kpis">
+                    <div class="tarjeta-kpi">
+                        <span class="kpi-titulo">Facturación Total</span>
+                        <strong id="kpi-facturacion" class="kpi-valor">$ 0.00</strong>
+                    </div>
+                    <div class="tarjeta-kpi">
+                        <span class="kpi-titulo">Operaciones</span>
+                        <strong id="kpi-operaciones" class="kpi-valor">0</strong>
+                    </div>
+                    <div class="tarjeta-kpi">
+                        <span class="kpi-titulo">Unidades Vendidas</span>
+                        <strong id="kpi-unidades" class="kpi-valor">0</strong>
+                    </div>
+                    <div class="tarjeta-kpi">
+                        <span class="kpi-titulo">Ticket Promedio</span>
+                        <strong id="kpi-ticket" class="kpi-valor">$ 0.00</strong>
+                    </div>
+                </div>
+
+                <!-- Lienzos de Gráficos Estadísticos Responsivos -->
+                <div class="grilla-graficos-bi">
+                    <div class="tarjeta-grafico">
+                        <h3>Top 10 Productos (Facturación)</h3>
+                        <canvas id="canvas-bi-barras" width="400" height="280"></canvas>
+                    </div>
+                    <div class="tarjeta-grafico">
+                        <h3>Evolución Mensual</h3>
+                        <canvas id="canvas-bi-lineas" width="400" height="280"></canvas>
+                    </div>
+                    <div class="tarjeta-grafico">
+                        <h3>Facturación por Categoría</h3>
+                        <canvas id="canvas-bi-torta" width="400" height="280"></canvas>
+                    </div>
+                </div>
+
+                <!-- Tabla de Detalle Histórico de Ventas -->
+                <div class="contenedor-tabla">
+                    <h3 class="titulo-seccion-tabla">Detalle Histórico de Ventas</h3>
+                    <div class="scroll-tabla">
+                        <table id="tabla-bi" class="tabla-datos">
+                            <thead>
+                                <tr>
+                                    <th>ID Venta</th>
+                                    <th>Producto</th>
+                                    <th>Categoría</th>
+                                    <th>Precio Congelado</th>
+                                    <th>Cantidad</th>
+                                    <th>Fecha</th>
+                                    <th>Total Cobrado</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Lógica cliente en JavaScript Vanilla conectada a la API REST -->
+        <script src="app_web.js"></script>
+    </body>
+</html>

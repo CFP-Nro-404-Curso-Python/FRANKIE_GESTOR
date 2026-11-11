@@ -1,0 +1,736 @@
+/* ============================================================================
+    HOJA DE ESTILOS RESPONSIVE (CAPA 4 - PRESENTACIÓN WEB)
+   ============================================================================
+    DECISIÓN DE DISEÑO (FIDELIDAD VISUAL Y ADAPTACIÓN MÓVIL / LAN):
+
+    - Replica exactamente la paleta cromática corporativa de Tkinter (#f0f2f5,
+      #2196F3, #4CAF50, #F44336, #FF9800, #9C27B0, #607D8B, #37474F, #009688).
+
+    - Aplica diseño fluido (CSS Grid + Flexbox) y controles táctiles (>= 44px)
+      con fuentes de 16px en inputs para evitar el auto-zoom en celulares.
+   ============================================================================ */
+
+:root {
+    --bg-principal: #f0f2f5;
+    --bg-tarjeta: #ffffff;
+    --texto-primario: #333333;
+    --texto-secundario: #666666;
+    --borde-suave: #dce1e7;
+
+    /* Paleta exacta heredada de las vistas de Escritorio (Tkinter) */
+    --color-azul: #2196F3;
+    --color-verde: #4CAF50;
+    --color-rojo: #F44336;
+    --color-naranja: #FF9800;
+    --color-violeta: #9C27B0;
+    --color-gris-azulado: #607D8B;
+    --color-pizarra: #37474F;
+    --color-teal: #009688;
+    --color-gris: #9E9E9E;
+
+    /* Consola SQL (estilo Darcula idéntico a consola.py) */
+    --bg-consola: #2b2b2b;
+    --texto-consola: #a9b7c6;
+
+    --sombra-tarjeta: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --radio-borde: 8px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: var(--bg-principal);
+    color: var(--texto-primario);
+    line-height: 1.45;
+    min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.oculto {
+    display: none !important;
+}
+
+
+
+/* ===================================================
+   1. BARRA SUPERIOR DE NAVEGACIÓN Y ESTADO DE SESIÓN
+   =================================================== */
+
+.barra-superior {
+    background-color: var(--color-pizarra);
+    color: #ffffff;
+    padding: 10px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.barra-contenedor {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.barra-marca {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.icono-marca {
+    font-size: 1.5rem;
+}
+
+.titulo-app {
+    font-size: 1.05rem;
+    font-weight: bold;
+    letter-spacing: 0.4px;
+}
+
+.subtitulo-operador {
+    font-size: 0.82rem;
+    color: #cfd8dc;
+}
+
+.barra-acciones {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.badge-red {
+    background-color: var(--color-verde);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+
+
+/* =========================================
+   2. CONTENEDOR SPA Y TRANSICIÓN DE VISTAS
+   ========================================= */
+
+.contenedor-principal {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+.vista-app {
+    display: none;
+    animation: aparecerVista 0.18s ease-out;
+}
+
+.vista-app.activa {
+    display: block;
+}
+
+@keyframes aparecerVista {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+
+/* ==================
+   3. VISTA DE LOGIN
+   ================== */
+
+.tarjeta-login {
+    background-color: var(--bg-tarjeta);
+    max-width: 400px;
+    margin: 48px auto;
+    padding: 28px 24px;
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    border: 1px solid var(--borde-suave);
+}
+
+.titulo-login {
+    text-align: center;
+    font-size: 1.25rem;
+    margin-bottom: 4px;
+}
+
+.subtitulo-login {
+    text-align: center;
+    font-size: 0.88rem;
+    color: var(--texto-secundario);
+    margin-bottom: 20px;
+}
+
+.texto-estado-login {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--texto-secundario);
+    margin-top: 14px;
+}
+
+
+
+/* ===============================================
+   4. SISTEMA DE BOTONES Y PALETA DE ROLES (RBAC)
+   =============================================== */
+
+.btn,
+.btn-panel {
+    border: none;
+    border-radius: 6px;
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 0.95rem;
+    padding: 11px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.1s ease;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn:hover:not(:disabled),
+.btn-panel:hover:not(:disabled) {
+    filter: brightness(1.08);
+}
+
+.btn:active:not(:disabled),
+.btn-panel:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+/* Estado deshabilitado idéntico al tk.DISABLED de Tkinter */
+.btn:disabled,
+.btn-panel:disabled {
+    background-color: #cccccc !important;
+    color: #777777 !important;
+    cursor: not-allowed;
+    opacity: 0.72;
+    box-shadow: none;
+}
+
+.btn-bloque {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.btn-sm {
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.btn-verde { background-color: var(--color-verde); }
+.btn-azul { background-color: var(--color-azul); }
+.btn-rojo { background-color: var(--color-rojo); }
+.btn-naranja { background-color: var(--color-naranja); }
+.btn-violeta { background-color: var(--color-violeta); }
+.btn-gris-azulado { background-color: var(--color-gris-azulado); }
+.btn-pizarra { background-color: var(--color-pizarra); }
+.btn-teal { background-color: var(--color-teal); }
+.btn-gris { background-color: var(--color-gris); }
+
+
+
+/* =====================================
+   5. PANEL DE CONTROL (MENÚ PRINCIPAL)
+   ===================================== */
+
+.cabecera-panel {
+    text-align: center;
+    margin: 12px 0 24px;
+}
+
+.titulo-bienvenida {
+    font-size: 1.4rem;
+    color: var(--texto-primario);
+    margin-bottom: 6px;
+}
+
+.subtitulo-rol {
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--texto-secundario);
+}
+
+.grilla-panel {
+    max-width: 680px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.btn-panel {
+    min-height: 62px;
+    font-size: 1.02rem;
+    box-shadow: var(--sombra-tarjeta);
+}
+
+.btn-ancho-completo {
+    grid-column: 1 / -1;
+}
+
+.pie-panel {
+    text-align: center;
+    margin-top: 28px;
+}
+
+
+
+/* ==========================================
+   6. FORMULARIOS ABM Y CONTROLES DE ENTRADA
+   ========================================== */
+
+.cabecera-modulo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--borde-suave);
+}
+
+.cabecera-modulo h2 {
+    font-size: 1.25rem;
+}
+
+.tarjeta-formulario {
+    background-color: var(--bg-tarjeta);
+    padding: 18px;
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    border: 1px solid var(--borde-suave);
+    margin-bottom: 18px;
+}
+
+.grilla-formulario {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+}
+
+.grupo-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 8px;
+}
+
+.grupo-campo label,
+.etiqueta-negrita {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--texto-primario);
+}
+
+/* Fuente de 16px (1rem) evita que iOS y Android hagan zoom molesto al tocar un input */
+.grupo-campo input,
+.grupo-campo select,
+.fila-descuento-global input {
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 10px;
+    font-size: 1rem;
+    border: 1px solid #c5ccd4;
+    border-radius: 6px;
+    background-color: #ffffff;
+    color: var(--texto-primario);
+}
+
+.grupo-campo input[readonly] {
+    background-color: #eef1f5;
+    color: #555555;
+}
+
+.grupo-campo input:focus,
+.grupo-campo select:focus,
+.consola-textarea:focus {
+    outline: 2px solid var(--color-azul);
+    border-color: transparent;
+}
+
+.barra-botones-abm {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--borde-suave);
+}
+
+.barra-botones-abm .btn {
+    flex: 1 1 140px;
+}
+
+
+
+/* ========================================================================
+   7. TABLAS DE DATOS (EQUIVALENTE A TREEVIEW CON SCROLL HORIZONTAL MÓVIL)
+   ======================================================================== */
+
+.contenedor-tabla {
+    background-color: var(--bg-tarjeta);
+    padding: 14px;
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    border: 1px solid var(--borde-suave);
+    margin-bottom: 18px;
+}
+
+.ayuda-tabla {
+    font-size: 0.84rem;
+    color: var(--texto-secundario);
+    margin-bottom: 10px;
+}
+
+.titulo-seccion-tabla {
+    font-size: 1.05rem;
+    margin-bottom: 10px;
+}
+
+.scroll-tabla {
+    width: 100%;
+    overflow-x: auto;
+    max-height: 360px;
+    overflow-y: auto;
+    border: 1px solid var(--borde-suave);
+    border-radius: 6px;
+}
+
+.tabla-datos {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+    font-size: 0.9rem;
+}
+
+.tabla-datos thead th {
+    background-color: #e9edf2;
+    color: var(--texto-primario);
+    font-weight: bold;
+    text-align: left;
+    padding: 10px 12px;
+    position: sticky;
+    top: 0;
+    border-bottom: 2px solid #cfd6de;
+    white-space: nowrap;
+}
+
+.tabla-datos tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eaedf1;
+    white-space: nowrap;
+}
+
+.tabla-datos tbody tr {
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+}
+
+.tabla-datos tbody tr:hover {
+    background-color: #f4f8fd;
+}
+
+.tabla-datos tbody tr.seleccionada {
+    background-color: #bbdefb !important;
+    font-weight: bold;
+}
+
+
+
+/* =======================================================
+   8. SECCIÓN DE TOTALES Y DESCUENTO GLOBAL (FACTURACIÓN)
+   ======================================================= */
+
+.tarjeta-totales-factura {
+    background-color: var(--bg-tarjeta);
+    padding: 18px;
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    border: 1px solid var(--borde-suave);
+}
+
+.texto-total-factura {
+    font-size: 1.2rem;
+    color: var(--texto-primario);
+    margin-bottom: 14px;
+}
+
+.bloque-descuento-global {
+    border-top: 1px solid var(--borde-suave);
+    padding-top: 14px;
+}
+
+.bloque-descuento-global h4 {
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+}
+
+.fila-descuento-global {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.fila-descuento-global input {
+    max-width: 140px;
+}
+
+.texto-resultado-descuento {
+    margin-top: 12px;
+    font-weight: bold;
+    font-size: 1.05rem;
+    color: var(--color-verde);
+}
+
+
+
+/* ===================================================
+   9. CONSOLA SQL DE AUDITORÍA (SANDBOX SOLO LECTURA)
+   =================================================== */
+
+.chips-sql {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 10px;
+}
+
+.chip {
+    background-color: #e3e8ee;
+    color: var(--texto-primario);
+    border: 1px solid #c8d0d9;
+    border-radius: 16px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-family: Consolas, monospace;
+    cursor: pointer;
+}
+
+.chip:hover {
+    background-color: #d3dbe4;
+}
+
+.consola-textarea {
+    width: 100%;
+    background-color: var(--bg-consola);
+    color: var(--texto-consola);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 1rem;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #1e1e1e;
+    resize: vertical;
+}
+
+.estado-sql {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+
+
+/* ====================================================
+   10. TABLERO DE INTELIGENCIA DE NEGOCIOS (BI / OLAP)
+   ==================================================== */
+
+.subtitulo-bi {
+    font-size: 0.88rem;
+    color: var(--texto-secundario);
+    margin-top: 2px;
+}
+
+.acciones-cabecera-bi {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.grilla-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.tarjeta-kpi {
+    background-color: var(--bg-tarjeta);
+    padding: 16px;
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    border: 1px solid var(--borde-suave);
+    border-left: 5px solid var(--color-azul);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.kpi-titulo {
+    font-size: 0.85rem;
+    color: var(--texto-secundario);
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.kpi-valor {
+    font-size: 1.45rem;
+    color: var(--texto-primario);
+}
+
+.grilla-graficos-bi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.tarjeta-grafico {
+    background-color: var(--bg-tarjeta);
+    padding: 14px;
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    border: 1px solid var(--borde-suave);
+    text-align: center;
+}
+
+.tarjeta-grafico h3 {
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+    color: var(--texto-primario);
+}
+
+.tarjeta-grafico canvas {
+    width: 100%;
+    height: auto;
+    max-height: 260px;
+}
+
+
+
+/* ===========================================================
+   11. MODAL DE ALERTAS (EQUIVALENTE A MESSAGEBOX DE TKINTER)
+   =========================================================== */
+
+.modal-fondo {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 999;
+}
+
+.modal-caja {
+    background-color: var(--bg-tarjeta);
+    width: 100%;
+    max-width: 420px;
+    border-radius: var(--radio-borde);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+
+.modal-cabecera {
+    background-color: var(--color-azul);
+    color: #ffffff;
+    padding: 12px 16px;
+}
+
+.modal-cabecera.error { background-color: var(--color-rojo); }
+.modal-cabecera.warning { background-color: var(--color-naranja); }
+.modal-cabecera.info { background-color: var(--color-verde); }
+
+.modal-cabecera h3 {
+    font-size: 1rem;
+}
+
+.modal-cuerpo {
+    padding: 18px 16px;
+    font-size: 0.95rem;
+    white-space: pre-line;
+}
+
+.modal-pie {
+    padding: 10px 16px 14px;
+    text-align: right;
+    border-top: 1px solid var(--borde-suave);
+}
+
+
+
+/* ================================================================
+   12. MEDIA QUERIES PARA CELULARES Y PANTALLAS PEQUEÑAS (< 640px)
+   ================================================================ */
+
+@media (max-width: 640px) {
+    .contenedor-principal {
+        padding: 10px;
+    }
+
+    .tarjeta-login {
+        margin: 20px auto;
+        padding: 20px 16px;
+    }
+
+    /* En celulares los botones del Panel de Control pasan a 1 sola columna amplia */
+    .grilla-panel {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .btn-panel {
+        min-height: 54px;
+        font-size: 0.98rem;
+    }
+
+    .cabecera-modulo {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .cabecera-modulo .btn,
+    .acciones-cabecera-bi .btn {
+        width: 100%;
+    }
+
+    .barra-botones-abm .btn {
+        flex: 1 1 100%;
+    }
+
+    .fila-descuento-global {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .fila-descuento-global input,
+    .fila-descuento-global .btn {
+        max-width: 100%;
+        width: 100%;
+    }
+}

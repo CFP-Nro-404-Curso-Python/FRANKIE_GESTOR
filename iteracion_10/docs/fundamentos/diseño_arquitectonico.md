@@ -43,7 +43,6 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 ├── 📁 db/                                       # Persistencia física aislada.
 │   ├── 📜 esquema.sql                           # DDL relacional 3FN, Vistas y Triggers.
 │   └── 🗄️ frankie_gestor.db                     # Base de datos generada en tiempo de ejecución.
-├── 📁 diagramas/                                # Almacenamiento para diagramas de arquitectura UML/Flujo (reservado).
 ├── 📁 docs/                                     # Documentación técnica de ingeniería.
 │   ├── 📝 descripcion.md                        # Entregable final: justificación S.O.L.I.D., patrones y TDD.
 │   ├── 📁 fundamentos/                          # Bases analíticas y de planificación.

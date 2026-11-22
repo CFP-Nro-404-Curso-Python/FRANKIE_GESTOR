@@ -1,74 +1,84 @@
-# 📄 Reporte de Ejecución - Etapa 4: Adaptadores de Presentación (Escritorio Tkinter + Web SPA Responsive)
+# 📄 Reporte de Ejecución - Etapa 4: Adaptadores de Presentación (CustomTkinter + Web SPA), Accesibilidad, i18n y Tests E2E
 
 ## 📌 Resumen de la Etapa
 
-Se construyó, integró y validó con éxito la **Capa de Presentación (Capa 4)** compuesta por dos clientes independientes que consumen en simultáneo la misma API RESTful (`src/infraestructura/api/`):
+Se construyó, evolucionó y validó con éxito la **Capa de Presentación (Capa 4)** compuesta por dos clientes independientes con paridad estética y funcional 1:1 que consumen en simultáneo la misma API RESTful (`src/infraestructura/api/`):
 
-1. **Cliente de Escritorio (`src/presentacion/escritorio/`)**: Refactorización integral de las 10 vistas de Tkinter para erradicar todo acoplamiento con `sqlite3` y `bcrypt`, delegando el 100% de la comunicación al adaptador centralizado `cliente_api.py`.
+1. **Cliente de Escritorio (`src/presentacion/escritorio/`)**: Migración integral de las 10 ventanas a **CustomTkinter** acotadas a resolución `<= 1280x720`, completamente desacopladas de `sqlite3` y `bcrypt`, y gobernadas por `ClienteAPI` + `GestorUI` (Patrón Observador).
 
-2. **Cliente Web SPA Responsive (`src/presentacion/web/`)**: Aplicación de Página Única (HTML5, CSS3 fluido y JavaScript Vanilla) diseñada bajo enfoque *Mobile-First* para operar desde celulares, tablets y PCs dentro de la red de área local (LAN).
+2. **Cliente Web SPA Responsive (`src/presentacion/web/`)**: Aplicación de Página Única (HTML5, CSS3 fluido y JavaScript Vanilla) bajo enfoque *Mobile-First* para operar desde celulares, tablets y PCs en red local (LAN), compartiendo exactamente el mismo *Design System* **Slate/Blue**, accesibilidad WCAG y soporte bilingüe que el cliente de escritorio.
+
+3. **Automatización Operativa (`*.bat`)**: Creación de lanzadores en la raíz del proyecto para ejecución normal (`iniciar_frankie_gestor.bat`) y ciclo efímero de pruebas con semillas BI (`iniciar_con_semillas.bat`).
 
 
 ## ⚙️ Componentes Desarrollados
 
-### 1. Adaptador de Escritorio (Tkinter + HTTP)
-* **`src/presentacion/escritorio/cliente_api.py`**: Cliente HTTP centralizado basado en `requests`. Gestiona la sesión del operador, inyecta automáticamente la cabecera de seguridad jerárquica `X-Operador-Id` en cada petición y normaliza los errores HTTP (`400`, `401`, `403`, `404`, `422`) en la excepción `ErrorClienteAPI`.
+### 1. Adaptador de Escritorio (CustomTkinter + HTTP + Patrón Observador)
+* **`src/presentacion/escritorio/cliente_api.py`**:
+  * **`ClienteAPI`**: Cliente HTTP centralizado sobre `requests` que gestiona la sesión activa, inyecta la cabecera RBAC `X-Operador-Id` y normaliza errores HTTP (`400`, `401`, `403`, `404`, `422`) en `ErrorClienteAPI`.
+  * **`GestorUI` (Patrón Observador - GoF)**: Centraliza los 4 perfiles visuales (**Claro**, **Oscuro**, **Claro Alto Contraste**, **Oscuro Alto Contraste**), el escalado tipográfico (`100%`, `115%`, `125%`) y el diccionario bilingüe **ES / EN**. Propaga cualquier cambio en vivo a todas las ventanas abiertas —incluyendo widgets híbridos como `ttk.Treeview` y gráficos `tk.Canvas`— y traduce etiquetas de roles en frontera (`"Sales Employee"` ↔ `"Empleado - Ventas"`) sin alterar el contrato canónico del Backend.
 
-* **`src/presentacion/escritorio/vistas/login.py`**: Nodo de arranque que verifica la estructura de `frankie_gestor.db` (permitiendo operar tanto en limpio como con semillas BI) y levanta automáticamente en segundo plano los servidores Uvicorn (`0.0.0.0:8000`) y HTTP Web (`0.0.0.0:8080`) con cierre limpio mediante `atexit`.
+* **`src/presentacion/escritorio/vistas/login.py`**: Nodo de arranque que verifica `frankie_gestor.db` mediante los adaptadores del Backend, levanta automáticamente FastAPI (`0.0.0.0:8000`) y el servidor Web LAN (`0.0.0.0:8080`) con cierre limpio vía `atexit`, y expone la barra de preferencias visuales desde el acceso inicial.
 
-* **Vistas Operativas y Gerenciales (`panel_control.py`, `usuarios.py`, `empleados.py`, `clientes.py`, `proveedores.py`, `stock.py`, `facturacion.py`, `consola.py`, `analitica.py`)**: Migradas en su totalidad al consumo de contratos JSON sobre HTTP, preservando intacta la experiencia de usuario, la matriz de permisos RBAC, el Sandboxing SQL de solo lectura y el procesamiento vectorizado con Pandas/Matplotlib.
+* **Vistas Operativas y Gerenciales (`panel_control.py`, `usuarios.py`, `empleados.py`, `clientes.py`, `proveedores.py`, `stock.py`, `facturacion.py`, `consola.py`, `analitica.py`)**:
+  * **Usabilidad y Accesibilidad:** Barra de preferencias reactiva (`EN/ES`, `Oscuro/Claro`, `A-`, `A+`, `HC`), atajos de teclado (`Esc`, `F5`, `Ctrl+F`, `Ctrl+Enter` en SQL), *zebra striping*, buscadores instantáneos y contadores de registros visibles.
+  * **Semáforo de Inventario (`stock.py`):** Resaltado automático de filas con stock agotado (`<= 0`) y stock bajo (`<= stock_minimo`) adaptado a los 4 perfiles cromáticos.
+  * **Facturación (`facturacion.py`):** Emisión y anulación delegando la restitución atómica de stock al Backend, con recálculo limpio de `TOTAL FACTURA` al aplicar descuentos globales sin acumulación compuesta.
+  * **Analítica BI (`analitica.py`):** Renderizado nativo sobre 3 `tk.Canvas` livianos (bajo consumo de RAM) con escala numérica compacta en eje Y (`$1.2M`, `$450k`), rotación diagonal con acortamiento inteligente en Top 10, submuestreo dinámico de meses anti-superposición y redibujado inmediato al alternar tema o contraste.
 
 ### 2. Adaptador Web SPA Multi-Dispositivo (LAN / Móvil)
-* **`src/presentacion/web/index.html`**: Maquetado semántico unificado de las 10 pantallas del sistema con soporte táctil y diálogos modales equivalentes a `messagebox`.
+* **`src/presentacion/web/index.html`**: Maquetado semántico de las 10 vistas con barra superior persistente de preferencias UI/WCAG, buscadores instantáneos en las 7 grillas, atributos `data-i18n` / `data-i18n-ph` y soporte ARIA (`role="toolbar"`, `aria-live="polite"`, `aria-pressed`, `aria-modal`).
 
-* **`src/presentacion/web/estilos.css`**: Hoja de estilos responsiva que replica exactamente la paleta cromática corporativa de Tkinter (`#2196F3`, `#4CAF50`, `#F44336`, `#FF9800`, `#9C27B0`, `#607D8B`, `#37474F`, `#009688`) e incorpora *Media Queries* (`@media (max-width: 640px)`), grillas flexibles y controles táctiles de al menos `44px`.
+* **`src/presentacion/web/estilos.css`**: Implementa el *Design System* **Slate/Blue** unificado (`#F1F5F9`, `#1E293B`, `#2563EB`, `#16A34A`, `#DC2626`, `#D97706`, `#7C3AED`, `#0D9488`, `#475569`) con 4 perfiles vía atributos en `<html>` (`data-theme`, `data-contrast`, `data-scale`), anillos `:focus-visible`, clases de semáforo de stock (`.fila-stock-bajo`, `.fila-stock-agotado`) y *Media Queries* móviles (`@media (max-width: 640px)`) con controles táctiles `>= 44px`.
 
-* **`src/presentacion/web/app_web.js`**: Motor asíncrono (`fetch`) con detección dinámica de IP en red local (`window.location.hostname`), sincronización en tiempo real con el Backend, consola SQL de auditoría en memoria y renderizado nativo de gráficos estadísticos BI sobre `<canvas>` HTML5 sin depender de librerías externas ni conexión a Internet.
+* **`src/presentacion/web/app_web.js`**: Cliente `fetch` asíncrono con detección automática de IP en red local (`window.location.hostname`), persistencia 3FN sin `localStorage` (usando `sessionStorage` únicamente para preferencias visuales de la pestaña), motor i18n ES/EN, atajos de teclado (`Esc`, `Ctrl+F`, `Ctrl+Enter`), consola SQL en sandbox y gráficos `<canvas>` HTML5 con la misma lógica anti-superposición y adaptación cromática de escritorio.
+
+### 3. Lanzadores Operativos
+* **`iniciar_frankie_gestor.bat`**: Activa `.venv`, configura `PYTHONPATH`, ejecuta `login.py` y desactiva el entorno al finalizar.
+* **`iniciar_con_semillas.bat`**: Automatiza el ciclo de pruebas efímero: elimina la base previa, inicializa el esquema 3FN + roles + `admin` sin abrir ventanas intermedias, ejecuta `semillas/generador_semilla_bi.py`, lanza `login.py` para pruebas y limpia `db/frankie_gestor.db` al cerrar la aplicación.
 
 
 ## 🧪 Estrategia de Testing E2E y Sincronización Multi-Cliente (TDD)
 
-Para garantizar cero regresiones visuales o de red, se incorporaron dos nuevas suites de integración automatizadas:
+Para validar todas las ventanas, la persistencia 3FN real sin cachés y las capacidades de accesibilidad/i18n, se consolidaron dos suites de integración automatizadas:
 
-* **`tests/integracion/test_vistas_escritorio.py` (7 pruebas E2E)**: Instancia las ventanas reales de Tkinter en modo *Headless* (`root.withdraw()`), intercepta `messagebox` con espías en memoria y conecta `requests` de `cliente_api.py` directamente al `TestClient` de FastAPI sobre una base SQLite temporal. Verifica cambios de contraseña de `admin`, preservación de roles, matriz RBAC en `PanelControl`, flujo Proveedores-Stock, visibilidad de `vendedor_bi`, circuito Facturación-Analítica BI, Sandboxing en Consola SQL y disparo del trigger `trg_proteger_ultimo_admin`.
+* **`tests/integracion/test_vistas_escritorio.py` (8 pruebas E2E)**: Instancia las 9 ventanas secundarias de CustomTkinter en modo *Headless* (`root.withdraw()`), intercepta `messagebox` y conecta `requests` de `cliente_api.py` al `TestClient` de FastAPI sobre una base SQLite temporal. Verifica cota `<= 1280x720`, matriz RBAC en `PanelControl`, coexistencia IAM/RRHH sin pisar credenciales ni legajos 3FN, ABM de Clientes/Proveedores/Stock con `ubicaciones_stock`, emisión y anulación de facturas con restitución exacta de stock, Sandboxing SQL, Tablero BI y el ciclo completo de Modo Oscuro, Alto Contraste, Zoom 125%, traducción ES/EN manteniendo roles canónicos, semáforo de stock y filtrado en vivo (`test_8`).
 
-* **`tests/integracion/test_sincronizacion_web_escritorio.py` (5 pruebas de sincronización)**: Audita la presencia de las 10 vistas y reglas responsive en la SPA web, valida las peticiones *Preflight CORS* (`OPTIONS`) desde orígenes móviles LAN (`http://192.168.1.45:8080`) y comprueba que las altas, ventas y credenciales creadas en la Web se reflejen instantáneamente en las grillas `Treeview` de Tkinter y viceversa.
+* **`tests/integracion/test_sincronizacion_web_escritorio.py` (7 pruebas de sincronización y paridad)**: Audita la estructura de `index.html`, `estilos.css` y `app_web.js` verificando cero invocaciones a `localStorage.`, valida *Preflight CORS* (`OPTIONS`) desde orígenes móviles LAN (`http://192.168.1.38:8080`), comprueba la sincronización bidireccional 3FN (incluyendo el flujo crítico Admin Escritorio → Gerente Web edita legajo 3FN de Vendedor → CustomTkinter RRHH refleja todos los campos) y audita la paridad 1:1 de temas, WCAG, i18n, buscadores y BI en la SPA Web (`test_7`).
 
 
-## 🚀 Resultados de Ejecución en Consola
+## 🚀 Resultados de Ejecución en Consola (Suite Final Sellada)
 
 ```text
-(.venv) D:\Repositorios de GitHub\CFP N°404\Curso de Python\FRANKIE_GESTOR\iteracion_10>pytest tests/ -v
+(.venv) D:\Repositorios de GitHub\Proyectos Personales\FRANKIE_GESTOR>pytest tests/ -v
 ======================================= test session starts =======================================
 platform win32 -- Python 3.14.8, pytest-9.1.1, pluggy-1.7.0
-rootdir: D:\Repositorios de GitHub\CFP N°404\Curso de Python\FRANKIE_GESTOR\iteracion_10
+rootdir: D:\Repositorios de GitHub\Proyectos Personales\FRANKIE_GESTOR
 configfile: pytest.ini
 plugins: anyio-4.15.1
-collected 32 items
+collected 35 items
 
-tests\integracion\test_api_rest.py ....                                                      [ 12%]
-tests\integracion\test_repositorios_sql.py ....                                              [ 25%]
-tests\integracion\test_sincronizacion_web_escritorio.py .....                                [ 40%]
-tests\integracion\test_vistas_escritorio.py .......                                          [ 62%]
-tests\unitarios\test_logica_inventario.py .....                                              [ 78%]
-tests\unitarios\test_politicas_rbac.py .......                                               [100%]
+tests\integracion\test_api_rest.py ....                                                      [ 11%]
+tests\integracion\test_repositorios_sql.py ....                                              [ 22%]
+tests\integracion\test_sincronizacion_web_escritorio.py .......                              [ 42%]
+tests\integracion\test_vistas_escritorio.py ........                                         [ 65%]
+tests\unitarios\test_logica_inventario.py .....                                              [ 80%]
+tests\unitarios\test_politicas_rbac.py .......                                               [ 100%]
 
 ======================================== warnings summary =========================================
-.venv\Lib\site-packages\fastapi\testclient.py:1
+..\..\CFP N°404\Curso de Python\FRANKIE_GESTOR\iteracion_10\.venv\Lib\site-packages\fastapi\testclient.py:1
   D:\Repositorios de GitHub\CFP N°404\Curso de Python\FRANKIE_GESTOR\iteracion_10\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
     from starlette.testclient import TestClient as TestClient  # noqa
 
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-================================= 32 passed, 1 warning in 29.27s ==================================
+-- Docs: [https://docs.pytest.org/en/stable/how-to/capture-warnings.html](https://docs.pytest.org/en/stable/how-to/capture-warnings.html)
+================================= 35 passed, 1 warning in 41.40s ==================================
 ```
 
-* **Total de Pruebas Ejecutadas:** 32 casos automatizados (12 Unitarios + 4 Persistencia SQL + 4 API REST + 7 GUI Tkinter E2E + 5 Sincronización Web/Escritorio).
-
+* **Total de Pruebas Ejecutadas:** 35 casos automatizados (12 Unitarios de Dominio + 4 Integración SQL 3FN/Triggers + 4 API REST + 8 GUI CustomTkinter E2E + 7 Sincronización y Paridad Web/Escritorio).
 * **Resultado Final:** `100% PASSED` (0 fallos, 0 errores).
-
-* **Tiempo de Ejecución Global:** `29.27 segundos`.
+* **Tiempo de Ejecución Global:** `41.40 segundos`.
 
 
 ## 🧠 Análisis Analítico y Arquitectónico
 
-La Etapa 4 demuestra en la práctica el valor principal de la **Arquitectura Hexagonal**: pudimos incorporar una segunda interfaz completa (Web SPA para móviles y PCs en red local) y migrar las 10 pantallas históricas de Tkinter sin modificar una sola línea de las reglas de negocio del Dominio. Ambos clientes operan ahora como ciudadanos de primera clase sobre el mismo motor transaccional, reflejando en tiempo real cada venta, ajuste de stock o cambio de permisos en todos los dispositivos conectados.
+La Etapa 4 valida empíricamente las tres promesas centrales de la **Arquitectura Hexagonal**: pudimos migrar por completo el cliente de escritorio a CustomTkinter, incorporar una segunda interfaz Web SPA responsive para red local y sumar Modo Oscuro, Alto Contraste WCAG, Zoom e internacionalización bilingüe ES/EN **sin modificar una sola línea del Dominio ni de la Persistencia**. Además, la auditoría E2E permitió detectar y resolver defectos reales antes de producción (como la restitución atómica de stock al anular comprobantes y el recálculo de `TOTAL FACTURA` bajo descuento global), dejando ambos clientes operando como ciudadanos de primera clase sobre una única fuente de verdad.

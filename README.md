@@ -1,113 +1,129 @@
-# 🛒 Sistema de Gestión Comercial en Python (Frankie Gestor)
+# 🛒 FRANKIE GESTOR — Sistema de Gestión Comercial Multi-Cliente en Python
 
-**Centro de Formación Profesional N° 404**
+**Autor:** David Hernan Bravo  
+**Stack:** Python 3.13 / 3.14 · FastAPI · SQLite3 (3FN + Triggers) · CustomTkinter · HTML5 / CSS3 / JS Vanilla · Bcrypt · Pytest (TDD)
 
-**Alumno:** David Hernan Bravo  
 ---
 
-## 📌 Descripción del Proyecto
+## 📌 Descripción General
 
-El desarrollo se estructura en múltiples etapas incrementales que documentan la evolución completa de un sistema de software comercial: desde un prototipo visual en memoria hasta una **Arquitectura Hexagonal distribuida con API RESTful (FastAPI), Analítica de Negocios (BI), Suite TDD de 32 pruebas automatizadas y doble interfaz sincronizada en tiempo real (Escritorio Tkinter + Web SPA Responsive para dispositivos móviles en red local)**.
+**Frankie Gestor** es un sistema comercial completo (Clientes, Proveedores, Stock, Facturación, Recursos Humanos, Gestión de Usuarios IAM, Consola SQL de Auditoría y Tablero BI/OLAP) diseñado bajo **Arquitectura Hexagonal (4 capas)**, principios **S.O.L.I.D.** y **Desarrollo Guiado por Pruebas (35 tests en verde con Pytest)**.
 
-Cada carpeta contiene el código fuente de la iteración y su respectivo análisis técnico detallado en el archivo `descripcion.md`.
+Su núcleo de negocio y base de datos relacional en **Tercera Forma Normal (3FN)** se exponen a través de una **API REST en FastAPI**, permitiendo operar simultáneamente en red local (LAN) desde dos interfaces sincronizadas en tiempo real con paridad visual y funcional 1:1:
 
+* **Escritorio (`CustomTkinter`):** 10 ventanas diseñadas bajo *Design System* **Slate/Blue** (`<= 1280x720`), gestionadas reactivamente por `GestorUI` (**Patrón Observador**).
+* **Web SPA Responsive (`HTML5 + CSS3 + JS Vanilla`):** Interfaz *Mobile-First* para PCs, tablets y smartphones conectados al mismo WiFi, sin `localStorage` para datos maestros.
 
-## 📂 Estructura del Proyecto e Iteraciones
+Ambas interfaces incorporan **Modo Claro/Oscuro**, **Alto Contraste WCAG**, **Escalado Tipográfico (`100% / 115% / 125%`)**, **soporte bilingüe Español/Inglés (ES/EN)**, atajos de teclado, buscadores instantáneos, **semáforo visual de inventario** y gráficos BI nativos en Canvas.
 
-El desarrollo abarca once etapas evolutivas (Iteraciones 0 a 10). Cada directorio preserva su independencia y documentación técnica:
+---
 
-| Iteración | Foco del Desarrollo | Análisis Detallado | 
-| ----- | ----- | ----- | 
-| **Iteración 0** | Esqueleto arquitectónico, jerarquía de Toplevels y sistema de navegación. | [📖 Ver descripcion.md](./iteracion_00/docs/descripcion.md) | 
-| **Iteración 1** | Maquetado de Interfaz de Usuario (UI), Layouts y grillas Treeview. | [📖 Ver descripcion.md](./iteracion_01/docs/descripcion.md) | 
-| **Iteración 2** | Lógica CRUD en memoria RAM (volátil), DOM de Tkinter y manejo de eventos. | [📖 Ver descripcion.md](./iteracion_02/docs/descripcion.md) | 
-| **Iteración 3** | Persistencia mediante archivos planos (CSV) y sincronización destructiva. | [📖 Ver descripcion.md](./iteracion_03/docs/descripcion.md) | 
-| **Iteración 4** | Integridad referencial cruzada entre CSVs, motor transaccional simulado y manejo de excepciones visuales. | [📖 Ver descripcion.md](./iteracion_04/docs/descripcion.md) | 
-| **Iteración 5** | Migración definitiva a motor relacional (SQLite3), identificadores ocultos (IID), operaciones ACID y anclaje estricto de rutas. | [📖 Ver descripcion.md](./iteracion_05/docs/descripcion.md) | 
-| **Iteración 6** | Ecosistema centralizado, Autenticación (Login), Seguridad RBAC, Consola SQL (Sandboxing) y Backups. | [📖 Ver descripcion.md](./iteracion_06/docs/descripcion.md) | 
-| **Iteración 7** | Criptografía (Bcrypt), Entornos Virtuales (.venv), UX Global (DRY) y Filtros Relacionales. | [📖 Ver descripcion.md](./iteracion_07/docs/descripcion.md) | 
-| **Iteración 8** | Normalización Extrema (3FN), Borrado Lógico, Triggers (Hard Delete Lock) y Transacciones Escalonadas. | [📖 Ver descripcion.md](./iteracion_08/docs/descripcion.md) | 
-| **Iteración 9** | Inteligencia de Negocios (BI / OLAP), procesamiento vectorizado con Pandas, gráficos Matplotlib y pipeline ETL de semillas masivas. | [📖 Ver descripcion.md](./iteracion_09/docs/descripcion.md) | 
-| **Iteración 10** | **Arquitectura Hexagonal (4 Capas), Principios S.O.L.I.D., API REST (FastAPI), Suite TDD (32 tests) y Doble Cliente Sincronizado (Tkinter + Web SPA Móvil LAN).** | [📖 Ver descripcion.md](./iteracion_10/docs/descripcion.md) | 
-|  |  |  |
+## 🏛️ Arquitectura y Catálogo de Diagramas (`diagramas/*.svg`)
 
-> 💡 **Nota sobre la Persistencia, Semillas y Arquitectura:** Entre las **Iteraciones 5 y 8** se consolidó la base relacional `db/frankie_gestor.db` en Tercera Forma Normal (3FN) gobernada por `db/esquema.sql` y aislada en un entorno virtual (`.venv`). En la **Iteración 9** se incorporó el motor analítico OLAP y el generador ETL de semillas (`semillas/generador_semilla_bi.py`). Finalmente, en la **Iteración 10**, el acceso a datos y la lógica de negocio se desacoplaron por completo de las pantallas mediante una **API REST en FastAPI**, permitiendo operar indistintamente con o sin semillas desde el escritorio y desde navegadores móviles en la misma red local.
+![Arquitectura Hexagonal de Frankie Gestor](./diagramas/02_clases_arquitectura_hexagonal.svg)
 
+| # | Plano Vectorial (SVG) | Descripción |
+| :---: | :--- | :--- |
+| **01** | [Casos de Uso y Jerarquía RBAC](./diagramas/01_casos_de_uso_rbac.svg) | Actores, herencia jerárquica y matriz de acceso a módulos. |
+| **02** | [Clases — Arquitectura Hexagonal](./diagramas/02_clases_arquitectura_hexagonal.svg) | Organización de las 4 capas y Regla de Dependencia. |
+| **03** | [Patrón Estrategia (RBAC)](./diagramas/03_patron_estrategia_rbac.svg) | Validación polimórfica de privilegios (`PoliticaAcceso`). |
+| **04** | [Patrón Unidad de Trabajo (UoW — ACID)](./diagramas/04_patron_unidad_de_trabajo.svg) | Transacciones atómicas en `GestorSQLite` (facturación y anulación). |
+| **05** | [Secuencia Multi-Cliente LAN](./diagramas/05_secuencia_multicliente_lan.svg) | Sincronización en tiempo real Web SPA ↔ FastAPI ↔ CustomTkinter. |
+| **06** | [DER Físico en 3FN (SQLite)](./diagramas/06_der_base_datos_3fn.svg) | 27 tablas normalizadas, vista activa y 5 triggers de integridad. |
+| **07** | [Patrón Observador (`GestorUI`)](./diagramas/07_patron_observador_gestor_ui.svg) | Propagación reactiva de temas, i18n ES/EN y accesibilidad WCAG. |
+| **08** | [Patrones Adaptador + Repositorio (DIP)](./diagramas/08_patron_adaptador_y_repositorio.svg) | Puertos abstractos (`puertos.py`) y sus adaptadores técnicos. |
+| **09** | [Inyección de Dependencias (IoC) + DTOs](./diagramas/09_patron_inyeccion_dependencias_y_dto.svg) | Contenedor `Depends()` de FastAPI, esquemas Pydantic y `dependency_overrides`. |
 
-## 🛠️ Evolución y Análisis Técnico
+---
 
-El enfoque principal de este proyecto es evidenciar el análisis crítico y la escalabilidad detrás de cada decisión de ingeniería de software:
+## 📈 Historia Evolutiva del Proyecto (Iteraciones 0 a 10)
 
-* **Mitigación de Acoplamiento (Lazy Imports):** Se evitó el clásico error de *Circular Import* cargando los submódulos de la interfaz únicamente en memoria local al momento de ser requeridos por la interacción del usuario, reduciendo el tiempo de arranque a cero.
+El sistema consolidado en este repositorio es el resultado de once etapas progresivas de ingeniería de software:
 
-* **Del Texto Libre a la Restricción:** Evolución clara desde el uso de simples `tk.Entry` (propensos a errores de tipeo humano) hacia menús `ttk.Combobox` en estado `readonly`, garantizando que el operador solo procese entidades validadas y preexistentes en los maestros.
+| Iteración | Hito Técnico Consolidado |
+| :--- | :--- |
+| **Iteración 0** | Esqueleto arquitectónico, jerarquía de ventanas `Toplevel` y sistema de navegación. |
+| **Iteración 1** | Maquetado de Interfaz de Usuario (UI), layouts estructurados y grillas `Treeview`. |
+| **Iteración 2** | Lógica CRUD en memoria RAM, manejo de eventos y flujo de formularios. |
+| **Iteración 3** | Persistencia inicial mediante archivos planos (`CSV`). |
+| **Iteración 4** | Integridad referencial cruzada, validaciones defensivas y alertas visuales (`messagebox`). |
+| **Iteración 5** | Migración definitiva a motor relacional **SQLite3**, identificadores ocultos (`iid`), operaciones ACID y anclaje dinámico de rutas. |
+| **Iteración 6** | Autenticación (`Login`), matriz de seguridad **RBAC**, Consola SQL en *Sandboxing* y Backups. |
+| **Iteración 7** | Criptografía con **Bcrypt** (hashing con *salt*), aislamiento en entorno virtual (`.venv`) y atajos globales (DRY). |
+| **Iteración 8** | Normalización estricta en **3FN** (27 tablas), borrado lógico (`habilitado`), **Triggers** (`Hard Delete Lock` + `trg_proteger_ultimo_admin`), vistas y columnas `GENERATED ALWAYS AS ... STORED`. |
+| **Iteración 9** | Módulo de **Inteligencia de Negocios (BI / OLAP)** y pipeline ETL de semillas (`semillas/generador_semilla_bi.py` con 1.000 productos y 500 facturas históricas). |
+| **Iteración 10 (Actual)** | **Arquitectura Hexagonal (4 capas), S.O.L.I.D., Patrones GoF/DDD, API REST (FastAPI), migración a CustomTkinter + Web SPA LAN con paridad 1:1 (Modo Oscuro, Alto Contraste WCAG, Zoom, i18n ES/EN, semáforo de stock), lanzadores `.bat` y suite TDD de 35 tests.** |
 
-* **Gestión de Claves Primarias (IID Oculto):** En lugar de exponer un ID de base de datos visualmente al usuario (un antipatrón UI), el sistema inyecta la Primary Key de SQLite en el parámetro interno `iid` del Treeview de Tkinter. Esto permite apuntar sentencias `UPDATE` y `DELETE` con precisión milimétrica sin ensuciar la interfaz gráfica.
+---
 
-* **Experiencia de Usuario (UX) Defensiva:** Erradicación de errores silenciosos en consola mediante la implementación estricta del módulo `tkinter.messagebox`. El sistema despliega alertas preventivas (stock mínimo perforado) y bloqueos duros (intentos de vender sin disponibilidad o con formatos inválidos).
+## 🛠️ Decisiones Clave de Ingeniería
 
-* **Anclaje Dinámico de Directorios:** Uso de `os.path.dirname(os.path.abspath(__file__))` para garantizar que el sistema encuentre siempre la base de datos independientemente de la ruta desde la cual la consola de comandos haya ejecutado el script.
+* **Desacople Total (Arquitectura Hexagonal + DIP):** El Dominio (`src/dominio/`) y los Casos de Uso (`src/aplicacion/`) no importan `sqlite3`, `bcrypt` ni `fastapi`; dependen solo de interfaces abstractas (`ABC`).
+* **Unificación Polimórfica e IAM vs. Legajo 3FN:** Empleados, Usuarios, Clientes y Proveedores convergen en `PerfilUsuario`. Gestión de Usuarios actualiza credenciales IAM y RRHH actualiza el legajo personal (`PUT` parcial con `exclude_unset=True`) sin pisarse mutuamente.
+* **Seguridad en Profundidad (3 Capas):** Validación de entrada con DTOs Pydantic (`422`), políticas jerárquicas polimórficas con Patrón Estrategia (`403`) y triggers físicos en SQLite (`RAISE ABORT` contra borrado físico y eliminación del último Administrador).
+* **Atomicidad Comercial (ACID):** Emitir o anular una factura ejecuta el alta/baja lógica y el descuento/restitución exacta de inventario dentro de una misma transacción de `GestorSQLite`.
+* **Capa 4 Reactiva y Accesible (Paridad 1:1):** `GestorUI` (Escritorio) y CSS Tokens + `sessionStorage` (Web) ofrecen 4 perfiles cromáticos (Claro, Oscuro y ambos en Alto Contraste), 3 niveles de zoom, traducción ES/EN en frontera (sin alterar los roles canónicos del Backend), atajos de teclado (`Esc`, `F5`, `Ctrl+F`, `Ctrl+Enter`), buscadores en vivo y gráficos BI nativos anti-superposición.
 
-* **Arquitectura de Seguridad (RBAC):** Implementación de un flujo de acceso cerrado. El sistema arranca desde un Login que inyecta los privilegios del usuario (Administrador, Gerente, Empleado) a un Panel de Control central, limitando dinámicamente la interfaz gráfica y bloqueando transacciones no autorizadas en el backend para prevenir ataques de escalada de privilegios.
+---
 
-* **Sandboxing SQL y Auditoría:** Desarrollo de una consola de ejecución aislada con filtros de expresiones regulares (Regex) y modo de solo lectura estricto (`mode=ro` + `PRAGMA query_only`) que bloquea sentencias destructivas (`DELETE`, `UPDATE`, `DROP`) e inyecta límites de paginación forzados para proteger la memoria.
+## 🚀 Instalación, Ejecución y Pruebas
 
-* **Criptografía y Aislamiento de Entorno:** Erradicación de contraseñas en texto plano migrando al estándar empresarial Bcrypt (hashing con salt). Esto transformó el proyecto en un paquete de software formal, aislando sus dependencias en un entorno virtual (`.venv`) documentado en un manifiesto `requirements.txt`.
+### Requisitos
+* Python **3.10 o superior** (validado en Python 3.13 y 3.14.8).
 
-* **Usabilidad Global (Principio DRY):** Implementación de Application-wide Binding (`bind_class`). En lugar de programar atajos de teclado (Copiar/Pegar) y menús contextuales widget por widget, se inyectaron a nivel de clase en el nodo raíz, propagando el comportamiento automáticamente a toda la interfaz sin duplicar código.
+### 1. Preparación del entorno virtual (primera vez)
 
-* **Normalización Extrema (3FN) y Transacciones Escalonadas:** Migración de tablas planas hacia un esquema de catálogos atomizados y tablas puente (relaciones N:M). El backend de Python ejecuta inserciones en cascada manejando múltiples PKs y FKs en una sola transacción unificada.
-
-* **Delegación al Motor SQL y Borrado Lógico:** Reemplazo de sentencias `DELETE` por `UPDATE habilitado=0` para preservar el historial contable. Implementación de Triggers `BEFORE DELETE` y `trg_proteger_ultimo_admin` con `RAISE(ABORT)` para blindar la base de datos contra borrados físicos o pérdida del último Administrador, junto con Vistas (`VIEWS`) y Columnas Calculadas (`GENERATED ALWAYS AS`).
-
-* **Inteligencia de Negocios (BI / OLAP):** Integración de `pandas` y `matplotlib` para transformar el historial transaccional en tableros gerenciales con KPIs vectorizados (Facturación Total, Operaciones, Unidades Vendidas, Ticket Promedio) y gráficos de barras, líneas y torta.
-
-* **Arquitectura Hexagonal, S.O.L.I.D. y Patrones GoF (Iteración 10):** Desacople total en 4 capas (Dominio, Aplicación, Infraestructura y Presentación). Reemplazo de condicionales de permisos por el **Patrón Estrategia**, manejo transaccional mediante **Unidad de Trabajo (Unit of Work)**, abstracción de persistencia con **Repositorios** e **Inyección de Dependencias** sobre **FastAPI**.
-
-* **Desarrollo Guiado por Pruebas (TDD) y Sincronización Multi-Cliente LAN:** Validación automatizada mediante **32 tests con Pytest** (unitarios, integración SQL, contratos HTTP, ventanas Tkinter en modo *Headless* y sincronización multi-cliente). Incorporación de una **Web SPA Responsive** que permite operar en simultáneo desde celulares y PCs en la red local reflejando los cambios al instante en todas las pantallas.
-
-
-## 🚀 Ejecución y Entorno de Pruebas (Iteración 10 — Versión Final)
-
-Para correr el sistema en su versión final desacoplada (**Iteración 10**), configurá el entorno virtual e instalá las dependencias del manifiesto. Al ejecutar `login.py`, el sistema inicializa automáticamente la base de datos (si no existe) y levanta en segundo plano tanto el servidor **API REST (puerto 8000)** como el **Servidor Web LAN (puerto 8080)**.
-
-**Requisitos del Sistema:**
-
-* Python 3.10 o superior instalado.
-
-**1. Instalación y Puesta en Marcha:**
-
-```
-# Navegar a la iteración final del sistema
-cd iteracion_10
-
-# Crear y activar el entorno virtual aislado (Windows)
+```bash
+# Crear y activar el entorno virtual (Windows)
 python -m venv .venv
 .venv\Scripts\activate
 
-# Instalar todas las dependencias (FastAPI, Uvicorn, Bcrypt, Pandas, Matplotlib, Requests, Pytest)
+# Instalar todas las dependencias
 pip install -r requirements.txt
+```
 
-# (Opcional) Poblar la base de datos con 1000 productos y 500 facturas históricas para BI
+### 2. Lanzamiento rápido con scripts `.bat` (Windows)
+
+* **Modo Operativo (conserva la base de datos `db/frankie_gestor.db`):**
+  ```bat
+  iniciar_frankie_gestor.bat
+  ```
+* **Modo Pruebas / Demo con Semillas BI (entorno efímero):**
+  ```bat
+  iniciar_con_semillas.bat
+  ```
+  *Elimina una DB previa si existiera, crea el esquema 3FN + roles + `admin`, siembra 1.000 productos y 500 facturas históricas, abre la aplicación y borra automáticamente la base temporal al cerrarla.*
+
+### 3. Lanzamiento manual (Windows / Linux)
+
+```bash
+# (Opcional) Poblar con datos históricos para probar el Tablero BI
 python semillas/generador_semilla_bi.py
 
-# Iniciar la aplicación de Escritorio y los servidores en segundo plano
+# Iniciar cliente de escritorio + API REST (:8000) + Servidor Web LAN (:8080)
 python src/presentacion/escritorio/vistas/login.py
-
-# Credenciales por defecto (Primer despliegue):
-# Usuario: admin
-# Clave: admin123
 ```
 
-**2. Acceso desde el Navegador Web (PC y Dispositivos Móviles en Red Local):**
+* **Credenciales iniciales por defecto:** Usuario `admin` · Contraseña `admin123`.
 
-* **Desde la misma PC:** Abrir el navegador en `http://localhost:8080`.
+### 4. Acceso Web desde PC o Celular en Red Local (LAN)
 
-* **Desde un Celular o Tablet conectado al mismo WiFi:** Consultar la dirección IPv4 de la PC ejecutando `ipconfig` en CMD (ej. `192.168.1.XX`) e ingresar desde el navegador móvil a `http://192.168.1.XX:8080`.
+* **En la misma PC:** `http://localhost:8080`
+* **En un celular o tablet (mismo WiFi):** Consultar la URL LAN mostrada en la barra superior del Panel de Control de Escritorio (ej. `http://192.168.1.XX:8080`).
 
-**3. Ejecución de la Suite de Pruebas Automatizadas (TDD):**
+### 5. Ejecución de la Suite de Pruebas Automatizadas (TDD — 35 Tests)
 
-```
-# Desde la carpeta iteracion_10 con el entorno virtual activo
+```bash
 pytest tests/ -v
 ```
+
+Resultado de referencia verificado: **`35 passed` (100% éxito)** cubriendo Dominio (12), Persistencia SQL 3FN y Triggers (4), API REST (4), Vistas CustomTkinter E2E + Temas/i18n/WCAG (8) y Sincronización/Paridad Web SPA LAN (7).
+
+---
+
+## 📚 Documentación Técnica Completa
+
+* [📘 Descripción Integral del Sistema (Entregable Técnico)](./docs/descripcion.md)
+* [🧠 Justificación Analítica del Diseño Arquitectónico y Árbol de Carpetas](./docs/fundamentos/diseño_arquitectonico.md)
+* [🧪 Plan de Construcción Guiado por Pruebas (TDD)](./docs/fundamentos/plan_construccion_guiado_TDD.md)
+* **Reportes por Etapa:** [Etapa 1](./docs/reportes/etapa_1.md) · [Etapa 2](./docs/reportes/etapa_2.md) · [Etapa 3](./docs/reportes/etapa_3.md) · [Etapa 4](./docs/reportes/etapa_4.md)

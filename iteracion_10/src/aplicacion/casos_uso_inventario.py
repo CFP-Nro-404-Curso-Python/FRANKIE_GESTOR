@@ -2,6 +2,8 @@ from src.dominio.entidades import Producto
 from src.dominio.excepciones import ErrorEntidadNoEncontrada
 from src.dominio.puertos import PuertoUnidadDeTrabajo
 
+
+
 # ==============================================================================
 #  CASOS DE USO: GESTIÓN DE INVENTARIO (CAPA 2 - APLICACIÓN)
 # ==============================================================================
@@ -13,8 +15,6 @@ from src.dominio.puertos import PuertoUnidadDeTrabajo
 #   al 'stock_actual' para evitar Condiciones de Carrera. El stock solo se 
 #   toca de manera atómica (sumando o restando) mediante actualizar_stock.
 # ==============================================================================
-
-
 
 class ServicioInventario:
     """
@@ -44,13 +44,14 @@ class ServicioInventario:
                 precio_venta=datos["precio_venta"],
                 stock_actual=datos.get("stock_actual", 0.0),
                 stock_minimo=datos.get("stock_minimo", 0.0),
-                vencimiento=datos.get("vencimiento", "S/D")
+                ubicacion=datos.get("ubicacion") or "S/D",
+                vencimiento=datos.get("vencimiento") or "S/D"
             )
             return self.uow.productos.guardar(nuevo_producto)
 
     def modificar_producto(self, id_producto: int, datos: dict) -> None:
         """
-         Caso de Uso: Edición de datos maestros del producto (precios, descripciones).
+         Caso de Uso: Edición de datos maestros del producto (precios, descripciones, ubicación).
         """
         with self.uow:
             producto = self.uow.productos.obtener_por_id(id_producto)
@@ -66,6 +67,7 @@ class ServicioInventario:
             producto.precio_costo = datos.get("precio_costo", producto.precio_costo)
             producto.precio_venta = datos.get("precio_venta", producto.precio_venta)
             producto.stock_minimo = datos.get("stock_minimo", producto.stock_minimo)
+            producto.ubicacion = datos.get("ubicacion", producto.ubicacion)
             producto.vencimiento = datos.get("vencimiento", producto.vencimiento)
             
             # Persistimos los cambios usando la Unidad de Trabajo (ACID).
@@ -97,13 +99,6 @@ class ServicioInventario:
                 
             self.uow.productos.actualizar_stock(id_producto, cantidad)
 
-    # -------------------------------------------------------------------------------------------
-    # CAMBIO APLICADO: LECTURA GENERAL DE INVENTARIO
-    #
-    # Se implementó el método 'listar_productos' para consultar el catálogo completo.
-    # Es vital para que las vistas de interfaz de usuario puedan poblar sus grillas (Treeviews).
-    # -------------------------------------------------------------------------------------------
-    
     def listar_productos(self) -> list[Producto]:
         """
          Caso de Uso: Obtener el catálogo completo de productos activos.

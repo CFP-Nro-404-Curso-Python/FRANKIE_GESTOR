@@ -20,7 +20,7 @@ bcrypt
 # ---------------------------------------------------------------------------------------------------------------
 
 # Framework moderno de alto rendimiento para la construcción de APIs RESTful.
-# Utiliza tipado estático de Python ( vía Pydantic) para validar y serializar automáticamente los paquetes JSON 
+# Utiliza tipado estático de Python (vía Pydantic) para validar y serializar automáticamente los paquetes JSON 
 # de entrada y salida, además de autogenerar la documentación interactiva bajo el estándar OpenAPI (Swagger UI).
 fastapi
 
@@ -37,6 +37,11 @@ uvicorn
 # Permite que el adaptador de escritorio (Tkinter) envíe peticiones (GET, POST, PUT, DELETE) al servidor backend 
 # y reciba respuestas JSON, erradicando por completo el acoplamiento directo con SQLite.
 requests
+
+# Wrapper moderno sobre la biblioteca estándar Tkinter para interfaces de escritorio.
+# Aporta widgets estilizados, soporte de escalado DPI y consistencia estética (Design System Slate/Blue) 
+# alineada con la interfaz Web SPA, manteniendo la vista desacoplada de la lógica de negocio y de SQLite.
+customtkinter
 
 # Librería de renderizado gráfico y visualización científica.
 # Provee el motor de trazado y el conector de interfaz (FigureCanvasTkAgg) para dibujar los gráficos estadísticos 

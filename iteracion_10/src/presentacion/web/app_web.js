@@ -1,17 +1,17 @@
-// =================================================================================================================
+// ==============================================================================
 //  CLIENTE WEB SPA Y ADAPTADOR FETCH (CAPA 4 - PRESENTACIÓN WEB)
-// =================================================================================================================
-//  DECISIÓN DE DISEÑO (MULTI-DISPOSITIVO EN RED LOCAL Y CERO DEPENDENCIAS):
+// ==============================================================================
+//  DECISIÓN DE DISEÑO (PARIDAD 1:1 CON CUSTOMTKINTER Y CERO CACHÉS DE NEGOCIO):
 //
-//   1. Detecta automáticamente la IP de la computadora servidor en la red WiFi usando 'window.location.hostname', 
-//      permitiendo operar desde celulares, tablets o cualquier PC conectada a la misma red local (LAN).
-
-//   2. Consume exactamente los mismos endpoints de FastAPI (puerto 8000) que la aplicación de escritorio Tkinter, 
-//      enviando la cabecera 'X-Operador-Id'.
-
-//   3. Dibuja los gráficos de Business Intelligence en HTML5 Canvas nativo para no depender de conexión a Internet 
-//      externa.
-// =================================================================================================================
+//   1. Detecta automáticamente la IP del servidor en la red WiFi usando
+//      'window.location.hostname', permitiendo operar desde PCs y celulares.
+//   2. Consume exactamente los mismos endpoints FastAPI (puerto 8000) que
+//      CustomTkinter enviando 'X-Operador-Id' para validación RBAC.
+//   3. Cero almacenamiento persistente para datos de negocio: todo legajo 3FN y
+//      ubicación de stock se persiste y lee directamente desde SQLite vía API.
+//   4. Preferencias visuales de sesión (Tema, Alto Contraste WCAG, Zoom e i18n)
+//      almacenadas únicamente en sessionStorage de la pestaña activa.
+// ==============================================================================
 
 const HOST_LAN = window.location.hostname || "127.0.0.1";
 const URL_BASE_API = `http://${HOST_LAN}:8000`;
@@ -27,35 +27,690 @@ let sesionActiva = {
 
 let intentosFallidosLogin = 0;
 
-// Diccionarios en memoria para traducir nombres, códigos e IDs en Stock y Facturación.
+// Estado de preferencias visuales y accesibilidad (espejo de GestorUI).
+const ESCALAS_WEB = ["1", "1.15", "1.25"];
+const prefUI = {
+    tema: "light",
+    altoContraste: false,
+    idioma: "es",
+    escala: "1"
+};
+
+// Cachés en RAM de la vista actual (para filtrado instantáneo y redibujado i18n/tema).
+let cacheUsuarios = [];
+let cacheEmpleados = [];
+let cacheClientes = [];
+let cacheProveedores = [];
+let cacheProductos = [];
+let cacheFacturas = [];
+let cacheRegistrosBI = [];
+let cacheTop10BI = [];
+let cacheMensualBI = [];
+let cacheCategoriasBI = [];
+let biEstrella = { producto: null, categoria: null };
+
+// Mapas efímeros de traducción ID <-> Etiqueta para selects de Stock y Facturación.
 let mapaProveedoresNombreAId = {};
 let mapaProveedoresIdANombre = {};
 let mapaProductosCodigoAObj = {};
 let mapaProductosIdAObj = {};
-let cacheStockAnterior = {};
+let stockPrevioPorId = {};
+let facturaSeleccionadaCache = null;
+let totalAcumuladoFacturacion = 0.0;
+let porcentajeGlobalActivo = 0.0;
+let estadoSQLMeta = { clave: "sql_est_esp", kwargs: {}, textoLibre: null, tipo: "muted" };
 
-// Almacenamiento local del navegador para conservar datos de contacto/ubicación en la sesión.
-function obtenerCacheLocal(clave) {
+
+// ==============================================================================
+//  1. MOTOR DE INTERNACIONALIZACIÓN (ES / EN), TEMAS Y ACCESIBILIDAD (WCAG)
+// ==============================================================================
+
+const ROLES_A_EN = {
+    "Administrador": "Administrator",
+    "Gerente": "Manager",
+    "Empleado - Ventas": "Sales Employee",
+    "Empleado - Compras": "Purchasing Employee",
+    "Proveedor": "Supplier",
+    "Cliente": "Customer"
+};
+
+const TRADUCCIONES_WEB = {
+    es: {
+        // Preferencias y comunes
+        btn_idioma: "EN",
+        btn_tema_oscuro: "Oscuro",
+        btn_tema_claro: "Claro",
+        btn_volver_panel: "⬅ Panel Principal",
+        btn_aceptar: "Aceptar",
+        btn_actualizar: "Actualizar",
+        btn_cerrar: "Cerrar",
+        btn_guardar: "Guardar",
+        btn_modificar: "Modificar",
+        btn_eliminar: "Eliminar",
+        btn_limpiar: "Limpiar",
+        buscar_ph: "Buscar en la tabla (Ctrl+F)...",
+        contador_filas: "Mostrando {visibles} de {total} registros",
+        atajos_web: "Atajos: Ctrl+F Buscar | Esc Volver",
+        sin_dato: "S/D",
+        sin_cred: "[Sin Credenciales]",
+        sel_rol: "Seleccione un rol...",
+
+        // Alertas comunes
+        val_tit: "Validación",
+        err_com_tit: "Error de Comunicación",
+        err_tx_tit: "Error de Transacción",
+        err_act_tit: "Error al Actualizar",
+        err_gua_tit: "Error al Guardar",
+        err_acc_tit: "Acceso Denegado",
+        err_acc_err_tit: "Acceso Denegado / Error",
+        err_bloq_tit: "Operación Bloqueada",
+        err_fmt_tit: "Error de Formato",
+        err_sel_tit: "Selección Requerida",
+
+        // Login
+        login_sub: "Sistema de Gestión Comercial — Acceso LAN",
+        login_usu: "Usuario",
+        login_usu_ph: "Ej: admin",
+        login_pass: "Contraseña",
+        login_btn: "Ingresar al Sistema",
+        login_intentos: "Intentos disponibles: {n}",
+        login_bloqueado: "Acceso bloqueado por seguridad.",
+        login_completar: "Completá todos los campos.",
+        login_ok_tit: "Acceso Concedido",
+        login_ok_msg: "Bienvenido/a, {nombre} {apellido}.\nRol: {rol}",
+        login_err_tit: "Error de Autenticación",
+        login_err_msg: "Credenciales incorrectas o usuario inhabilitado. Intentos restantes: {n}",
+        login_bloq_tit: "Bloqueo de Seguridad",
+        login_bloq_msg: "Superaste el límite de intentos fallidos. Recargá la página o contactá al Administrador.",
+
+        // Panel
+        panel_saludo: "BIENVENIDO/A, {nombre}",
+        panel_sub: "Panel Operativo — Permisos habilitados para: {rol}",
+        panel_clientes: "Gestión de Clientes",
+        panel_facturacion: "Facturación",
+        panel_proveedores: "Gestión de Proveedores",
+        panel_stock: "Control de Stock",
+        panel_empleados: "Recursos Humanos (RRHH)",
+        panel_usuarios: "Gestión de Usuarios (IAM)",
+        panel_consola: "Consola SQL (Auditoría)",
+        panel_backup: "Generar Backup JSON",
+        panel_analitica: "Analítica de Ventas (Tablero BI / OLAP)",
+        panel_salir: "Cerrar Sesión",
+        bkp_ok_tit: "Backup Exitoso",
+        bkp_ok_msg: "Copia de seguridad descargada en tu dispositivo como:\n{archivo}",
+        bkp_err_tit: "Error de Backup",
+
+        // Usuarios
+        usu_header: "GESTIÓN DE USUARIOS Y CREDENCIALES (IAM)",
+        usu_nombres: "Nombres *",
+        usu_nombres_ph: "Nombre del usuario",
+        usu_apellidos: "Apellidos *",
+        usu_apellidos_ph: "Apellido del usuario",
+        usu_login: "Usuario (Login) *",
+        usu_login_ph: "Cuenta de acceso",
+        usu_pass: "Contraseña",
+        usu_pass_ph: "Vacío al editar para conservar",
+        usu_rol: "Rol Asignado *",
+        usu_ayuda: "Tocá una fila para editar credenciales o cambiar el rol asignado.",
+        usu_todos_req: "Todos los campos son obligatorios en este módulo.",
+        usu_priv_err: "Privilegios insuficientes para crear perfiles de esta jerarquía.",
+        usu_sel_req: "Tocá primero un usuario de la tabla.",
+        usu_mod_req: "Nombres, Apellidos, Usuario y Rol son obligatorios.",
+        col_usuario: "Usuario",
+        col_rol_sis: "Rol del Sistema",
+        col_nombres: "Nombres",
+        col_apellidos: "Apellidos",
+
+        // Empleados
+        emp_header: "RECURSOS HUMANOS — LEGAJOS DE EMPLEADOS",
+        emp_dni: "DNI",
+        emp_tel: "Teléfono",
+        emp_email: "Email",
+        emp_dir: "Dirección",
+        emp_ciudad: "Ciudad",
+        emp_prov: "Provincia",
+        emp_cp: "Cód. Postal",
+        emp_rol: "Rol Organizacional *",
+        emp_btn_guardar: "Guardar Perfil",
+        emp_btn_modificar: "Modificar Perfil",
+        emp_btn_eliminar: "Eliminar Perfil",
+        emp_ayuda: "Tocá un empleado de la nómina para completar o actualizar su legajo 3FN.",
+        emp_req: "Nombres, Apellidos y Rol Organizacional son obligatorios.",
+        emp_priv_err: "Privilegios insuficientes para crear perfiles de esta jerarquía organizativa.",
+        emp_sel_req: "Tocá primero un empleado de la tabla.",
+        col_dni: "DNI",
+        col_tel: "Teléfono",
+        col_email: "Email",
+        col_dir: "Dirección",
+        col_ciudad: "Ciudad",
+        col_prov: "Provincia",
+        col_cp: "CP",
+        col_rol: "Rol",
+
+        // Clientes
+        cli_header: "GESTIÓN DE CLIENTES",
+        cli_cp: "Código Postal",
+        cli_btn_guardar: "Guardar Cliente",
+        cli_btn_modificar: "Modificar Cliente",
+        cli_btn_eliminar: "Eliminar Cliente",
+        cli_ayuda: "Tocá un cliente en la tabla para cargarlo en el formulario.",
+        cli_req: "Nombres y Apellidos son obligatorios.",
+        cli_sel_req: "Tocá primero un cliente de la tabla.",
+
+        // Proveedores
+        prov_header: "GESTIÓN DE PROVEEDORES",
+        prov_razon: "Razón Social *",
+        prov_cuit: "CUIT",
+        prov_contacto: "Contacto (Rep.)",
+        prov_btn_guardar: "Guardar Proveedor",
+        prov_btn_modificar: "Modificar Proveedor",
+        prov_btn_eliminar: "Eliminar Proveedor",
+        prov_ayuda: "Tocá un proveedor en la tabla para editar sus datos.",
+        prov_req: "La Razón Social es obligatoria.",
+        prov_sel_req: "Tocá primero un proveedor de la tabla.",
+        col_razon: "Razón Social",
+        col_cuit: "CUIT",
+        col_contacto: "Contacto",
+
+        // Stock
+        stk_header: "CONTROL DE STOCK E INVENTARIO",
+        stk_codigo: "Código *",
+        stk_desc: "Descripción *",
+        stk_cat: "Categoría",
+        stk_prov: "Proveedor *",
+        stk_ubic: "Ubicación",
+        stk_act: "Stock Actual",
+        stk_min: "Stock Mínimo",
+        stk_costo: "Precio Costo ($)",
+        stk_venta: "Precio Venta ($)",
+        stk_venc: "Vencimiento",
+        stk_sel_prov: "Seleccione proveedor...",
+        stk_btn_guardar: "Guardar Producto",
+        stk_btn_modificar: "Modificar Producto",
+        stk_btn_eliminar: "Eliminar Producto",
+        stk_semaforo: "Referencias: Amarillo = Stock Bajo (<= Mínimo) | Rojo = Agotado (0)",
+        stk_req: "Código, Descripción y Proveedor son campos obligatorios.",
+        stk_prov_inv: "El proveedor seleccionado no es válido o fue dado de baja.",
+        stk_nums_err: "Asegurate de ingresar valores numéricos válidos en precios y stock.",
+        stk_sel_req: "Tocá primero un producto de la tabla.",
+        col_codigo: "Código",
+        col_desc: "Descripción",
+        col_cat: "Categoría",
+        col_prov_col: "Proveedor",
+        col_stk_act: "Stock Actual",
+        col_stk_min: "Stock Mínimo",
+        col_costo: "Precio Costo",
+        col_venta: "Precio Venta",
+        col_ubic: "Ubicación",
+        col_venc: "Vencimiento",
+
+        // Facturación
+        fac_header: "FACTURACIÓN Y OPERACIONES COMERCIALES",
+        fac_vendedor: "Datos del Vendedor *",
+        fac_cliente: "Datos del Cliente *",
+        fac_producto: "Producto *",
+        fac_cantidad: "Cantidad *",
+        fac_valor: "Valor Unitario ($)",
+        fac_desc_item: "Descuento por Ítem (%)",
+        fac_sel_vend: "Seleccione vendedor...",
+        fac_sel_cli: "Seleccione cliente...",
+        fac_sel_prod: "Seleccione producto...",
+        fac_btn_guardar: "Guardar Facturación",
+        fac_btn_modificar: "Modificar Facturación",
+        fac_btn_eliminar: "Eliminar Facturación",
+        fac_total: "TOTAL FACTURA: $ {monto}",
+        fac_total_desc: "Total con descuento ({pct}%): $ {monto}",
+        fac_aplicar_desc: "APLICAR DESCUENTO GLOBAL",
+        fac_desc_global: "Descuento Global (%):",
+        fac_btn_calc: "Calcular Descuento Final",
+        fac_req: "Vendedor, Cliente y Producto son obligatorios.",
+        fac_nums_err: "Ingresá valores numéricos válidos en Cantidad y Descuento.",
+        fac_rango_err: "El descuento debe estar entre 0 y 100% y la cantidad > 0.",
+        fac_asoc_err: "Seleccioná un vendedor, cliente y producto válidos del menú.",
+        fac_sel_req: "Tocá primero una factura de la tabla.",
+        fac_rep_tit: "Alerta de Reposición",
+        fac_rep_msg: "El producto llegó a su stock mínimo. Quedan {u} unidades.",
+        fac_desc_rango: "El descuento global debe estar entre 0 y 100%.",
+        col_prod: "Producto",
+        col_cant: "Cantidad",
+        col_valor: "Valor en $",
+        col_desc_pct: "Descuento en %",
+        col_total: "Total en $",
+
+        // Consola SQL
+        sql_header: "CONSOLA SQL — AUDITORÍA EN SANDBOX (SOLO LECTURA)",
+        sql_ingrese: "Ingresá tu sentencia SQL (SELECT):",
+        sql_btn_ejec: "Ejecutar Consulta",
+        sql_btn_limp: "Limpiar Consola",
+        sql_est_esp: "Estado: Esperando consulta...",
+        sql_est_rbac: "Estado: Bloqueado por falta de privilegios RBAC.",
+        sql_est_sbx: "Estado: Query bloqueada por Sandboxing.",
+        sql_est_ok: "Estado: Ejecución exitosa. Filas recuperadas: {n}",
+        sql_solo_admin: "Solo un Administrador activo puede ejecutar auditorías SQL.",
+        sql_bloq_tit: "Bloqueo de Seguridad",
+        sql_bloq_msg: "Transacción abortada. Operación destructiva detectada.\nEsta consola es de Solo Lectura (SELECT).",
+        sql_solo_sel: "Error SQL: Solo se admiten sentencias que comiencen con SELECT.",
+
+        // Analítica BI
+        bi_header: "TABLERO DE CONTROL — ANALÍTICA BI / OLAP",
+        bi_sub_ini: "Análisis estadístico en tiempo real",
+        bi_sub_vacio: "Sin ventas registradas para analizar",
+        bi_sub_top: "Más Vendido: {prod} | Categoría Top: {cat}",
+        bi_btn_act: "Actualizar Análisis",
+        bi_kpi_fac: "Facturación Total",
+        bi_kpi_ops: "Operaciones",
+        bi_kpi_uni: "Unidades Vendidas",
+        bi_kpi_tkt: "Ticket Promedio",
+        bi_graf_top10: "Top 10 Productos (Facturación)",
+        bi_graf_mensual: "Evolución Mensual",
+        bi_graf_cat: "Facturación por Categoría",
+        bi_detalle_tit: "Detalle Histórico de Ventas",
+        bi_sin_datos: "Sin datos",
+        bi_info_vacio: "No hay ventas registradas para analizar.",
+        col_id_venta: "ID Venta",
+        col_precio_cong: "Precio Congelado",
+        col_fecha: "Fecha",
+        col_total_cob: "Total Cobrado"
+    },
+    en: {
+        // Common & preferences
+        btn_idioma: "ES",
+        btn_tema_oscuro: "Dark",
+        btn_tema_claro: "Light",
+        btn_volver_panel: "⬅ Main Dashboard",
+        btn_aceptar: "OK",
+        btn_actualizar: "Refresh",
+        btn_cerrar: "Close",
+        btn_guardar: "Save",
+        btn_modificar: "Update",
+        btn_eliminar: "Delete",
+        btn_limpiar: "Clear",
+        buscar_ph: "Filter table (Ctrl+F)...",
+        contador_filas: "Showing {visibles} of {total} records",
+        atajos_web: "Shortcuts: Ctrl+F Search | Esc Back",
+        sin_dato: "N/A",
+        sin_cred: "[No Credentials]",
+        sel_rol: "Select a role...",
+
+        // Common alerts
+        val_tit: "Validation",
+        err_com_tit: "Communication Error",
+        err_tx_tit: "Transaction Error",
+        err_act_tit: "Update Error",
+        err_gua_tit: "Save Error",
+        err_acc_tit: "Access Denied",
+        err_acc_err_tit: "Access Denied / Error",
+        err_bloq_tit: "Operation Blocked",
+        err_fmt_tit: "Format Error",
+        err_sel_tit: "Selection Required",
+
+        // Login
+        login_sub: "Commercial Management System — LAN Access",
+        login_usu: "Username",
+        login_usu_ph: "e.g. admin",
+        login_pass: "Password",
+        login_btn: "Sign In",
+        login_intentos: "Remaining attempts: {n}",
+        login_bloqueado: "Access locked for security.",
+        login_completar: "Please fill in all fields.",
+        login_ok_tit: "Access Granted",
+        login_ok_msg: "Welcome, {nombre} {apellido}.\nRole: {rol}",
+        login_err_tit: "Authentication Error",
+        login_err_msg: "Invalid credentials or disabled account. Remaining attempts: {n}",
+        login_bloq_tit: "Security Lockout",
+        login_bloq_msg: "Maximum failed attempts exceeded. Reload the page or contact an Administrator.",
+
+        // Dashboard
+        panel_saludo: "WELCOME, {nombre}",
+        panel_sub: "Operations Dashboard — Enabled permissions for: {rol}",
+        panel_clientes: "Customer Management",
+        panel_facturacion: "Invoicing",
+        panel_proveedores: "Supplier Management",
+        panel_stock: "Inventory Control",
+        panel_empleados: "Human Resources (HR)",
+        panel_usuarios: "User Management (IAM)",
+        panel_consola: "SQL Console (Audit)",
+        panel_backup: "Generate JSON Backup",
+        panel_analitica: "Sales Analytics (BI / OLAP Dashboard)",
+        panel_salir: "Sign Out",
+        bkp_ok_tit: "Backup Successful",
+        bkp_ok_msg: "Backup downloaded to your device as:\n{archivo}",
+        bkp_err_tit: "Backup Error",
+
+        // Users
+        usu_header: "USER & CREDENTIALS MANAGEMENT (IAM)",
+        usu_nombres: "First Name *",
+        usu_nombres_ph: "User first name",
+        usu_apellidos: "Last Name *",
+        usu_apellidos_ph: "User last name",
+        usu_login: "Username (Login) *",
+        usu_login_ph: "Account username",
+        usu_pass: "Password",
+        usu_pass_ph: "Leave empty on edit to keep",
+        usu_rol: "Assigned Role *",
+        usu_ayuda: "Tap a row to edit credentials or update the assigned role.",
+        usu_todos_req: "All fields are required in this module.",
+        usu_priv_err: "Insufficient privileges to create profiles at this hierarchy level.",
+        usu_sel_req: "Tap a user row from the table first.",
+        usu_mod_req: "First Name, Last Name, Username and Role are required.",
+        col_usuario: "Username",
+        col_rol_sis: "System Role",
+        col_nombres: "First Name",
+        col_apellidos: "Last Name",
+
+        // Employees
+        emp_header: "HUMAN RESOURCES — EMPLOYEE RECORDS",
+        emp_dni: "ID / DNI",
+        emp_tel: "Phone",
+        emp_email: "Email",
+        emp_dir: "Address",
+        emp_ciudad: "City",
+        emp_prov: "State / Province",
+        emp_cp: "Postal Code",
+        emp_rol: "Organizational Role *",
+        emp_btn_guardar: "Save Profile",
+        emp_btn_modificar: "Update Profile",
+        emp_btn_eliminar: "Delete Profile",
+        emp_ayuda: "Tap an employee row to complete or update their 3FN record.",
+        emp_req: "First Name, Last Name and Organizational Role are required.",
+        emp_priv_err: "Insufficient privileges to create profiles at this hierarchy level.",
+        emp_sel_req: "Tap an employee row from the table first.",
+        col_dni: "DNI",
+        col_tel: "Phone",
+        col_email: "Email",
+        col_dir: "Address",
+        col_ciudad: "City",
+        col_prov: "Province",
+        col_cp: "ZIP",
+        col_rol: "Role",
+
+        // Customers
+        cli_header: "CUSTOMER MANAGEMENT",
+        cli_cp: "Postal Code",
+        cli_btn_guardar: "Save Customer",
+        cli_btn_modificar: "Update Customer",
+        cli_btn_eliminar: "Delete Customer",
+        cli_ayuda: "Tap a customer row to load their details into the form.",
+        cli_req: "First Name and Last Name are required.",
+        cli_sel_req: "Tap a customer row from the table first.",
+
+        // Suppliers
+        prov_header: "SUPPLIER MANAGEMENT",
+        prov_razon: "Company Name *",
+        prov_cuit: "Tax ID (CUIT)",
+        prov_contacto: "Contact Rep.",
+        prov_btn_guardar: "Save Supplier",
+        prov_btn_modificar: "Update Supplier",
+        prov_btn_eliminar: "Delete Supplier",
+        prov_ayuda: "Tap a supplier row to edit their details.",
+        prov_req: "Company Name is required.",
+        prov_sel_req: "Tap a supplier row from the table first.",
+        col_razon: "Company Name",
+        col_cuit: "CUIT",
+        col_contacto: "Contact",
+
+        // Stock
+        stk_header: "INVENTORY & STOCK CONTROL",
+        stk_codigo: "SKU / Code *",
+        stk_desc: "Description *",
+        stk_cat: "Category",
+        stk_prov: "Supplier *",
+        stk_ubic: "Location",
+        stk_act: "Current Stock",
+        stk_min: "Minimum Stock",
+        stk_costo: "Cost Price ($)",
+        stk_venta: "Sale Price ($)",
+        stk_venc: "Expiration",
+        stk_sel_prov: "Select supplier...",
+        stk_btn_guardar: "Save Product",
+        stk_btn_modificar: "Update Product",
+        stk_btn_eliminar: "Delete Product",
+        stk_semaforo: "Legend: Amber = Low Stock (<= Min) | Red = Out of Stock (0)",
+        stk_req: "Code, Description and Supplier are required.",
+        stk_prov_inv: "Selected supplier is invalid or inactive.",
+        stk_nums_err: "Please enter valid numeric values for prices and stock.",
+        stk_sel_req: "Tap a product row from the table first.",
+        col_codigo: "Code",
+        col_desc: "Description",
+        col_cat: "Category",
+        col_prov_col: "Supplier",
+        col_stk_act: "Stock",
+        col_stk_min: "Min Stock",
+        col_costo: "Cost Price",
+        col_venta: "Sale Price",
+        col_ubic: "Location",
+        col_venc: "Expiration",
+
+        // Invoicing
+        fac_header: "INVOICING & COMMERCIAL OPERATIONS",
+        fac_vendedor: "Salesperson *",
+        fac_cliente: "Customer *",
+        fac_producto: "Product *",
+        fac_cantidad: "Quantity *",
+        fac_valor: "Unit Price ($)",
+        fac_desc_item: "Item Discount (%)",
+        fac_sel_vend: "Select salesperson...",
+        fac_sel_cli: "Select customer...",
+        fac_sel_prod: "Select product...",
+        fac_btn_guardar: "Save Invoice",
+        fac_btn_modificar: "Update Invoice",
+        fac_btn_eliminar: "Delete Invoice",
+        fac_total: "INVOICE TOTAL: $ {monto}",
+        fac_total_desc: "Total with discount ({pct}%): $ {monto}",
+        fac_aplicar_desc: "APPLY GLOBAL DISCOUNT",
+        fac_desc_global: "Global Discount (%):",
+        fac_btn_calc: "Calculate Final Total",
+        fac_req: "Salesperson, Customer and Product are required.",
+        fac_nums_err: "Enter valid numeric values for Quantity and Discount.",
+        fac_rango_err: "Quantity must be > 0 and Discount between 0 and 100%.",
+        fac_asoc_err: "Please select a valid salesperson, customer and product.",
+        fac_sel_req: "Tap an invoice row from the table first.",
+        fac_rep_tit: "Restock Alert",
+        fac_rep_msg: "Product reached minimum stock level. {u} units remaining.",
+        fac_desc_rango: "Global discount must be between 0 and 100%.",
+        col_prod: "Product",
+        col_cant: "Qty",
+        col_valor: "Unit Price $",
+        col_desc_pct: "Discount %",
+        col_total: "Total $",
+
+        // SQL Console
+        sql_header: "SQL CONSOLE — SANDBOX AUDIT (READ-ONLY)",
+        sql_ingrese: "Enter your SQL query (SELECT):",
+        sql_btn_ejec: "Run Query",
+        sql_btn_limp: "Clear Console",
+        sql_est_esp: "Status: Waiting for query...",
+        sql_est_rbac: "Status: Blocked due to insufficient RBAC privileges.",
+        sql_est_sbx: "Status: Query blocked by Sandbox policy.",
+        sql_est_ok: "Status: Query executed successfully. Rows returned: {n}",
+        sql_solo_admin: "Only an active Administrator can run SQL audit queries.",
+        sql_bloq_tit: "Security Block",
+        sql_bloq_msg: "Transaction aborted. Destructive operation detected.\nThis console is Read-Only (SELECT).",
+        sql_solo_sel: "SQL Error: Only SELECT statements are allowed.",
+
+        // BI Analytics
+        bi_header: "CONTROL DASHBOARD — BI / OLAP ANALYTICS",
+        bi_sub_ini: "Real-time statistical analysis",
+        bi_sub_vacio: "No sales records available for analysis",
+        bi_sub_top: "Top Seller: {prod} | Top Category: {cat}",
+        bi_btn_act: "Refresh Analytics",
+        bi_kpi_fac: "Total Revenue",
+        bi_kpi_ops: "Transactions",
+        bi_kpi_uni: "Units Sold",
+        bi_kpi_tkt: "Average Ticket",
+        bi_graf_top10: "Top 10 Products (Revenue)",
+        bi_graf_mensual: "Monthly Trend",
+        bi_graf_cat: "Revenue by Category",
+        bi_detalle_tit: "Sales History Detail",
+        bi_sin_datos: "No data",
+        bi_info_vacio: "No sales records available for analysis.",
+        col_id_venta: "Sale ID",
+        col_precio_cong: "Frozen Price",
+        col_fecha: "Date",
+        col_total_cob: "Total Charged"
+    }
+};
+
+function tWeb(clave, vars = {}) {
+    const dic = TRADUCCIONES_WEB[prefUI.idioma] || TRADUCCIONES_WEB.es;
+    let texto = dic[clave] !== undefined ? dic[clave] : (TRADUCCIONES_WEB.es[clave] || clave);
+    Object.entries(vars).forEach(([k, v]) => {
+        texto = texto.replaceAll(`{${k}}`, String(v));
+    });
+    return texto;
+}
+
+function rolAUI(rolCanonico) {
+    if (!rolCanonico) return tWeb("sin_dato");
+    return prefUI.idioma === "en" ? (ROLES_A_EN[rolCanonico] || rolCanonico) : rolCanonico;
+}
+
+function valorVisual(valor) {
+    return valor && valor !== "S/D" ? valor : tWeb("sin_dato");
+}
+
+function guardarPreferenciasSesion() {
     try {
-        return JSON.parse(localStorage.getItem(clave) || "{}");
+        sessionStorage.setItem("frankie_ui_prefs", JSON.stringify(prefUI));
     } catch {
-        return {};
+        // Entornos restringidos sin sessionStorage: continúa en memoria RAM.
     }
 }
 
-function guardarCacheLocal(clave, objeto) {
+function cargarPreferenciasSesion() {
     try {
-        localStorage.setItem(clave, JSON.stringify(objeto));
+        const guardado = sessionStorage.getItem("frankie_ui_prefs");
+        if (guardado) {
+            const parsed = JSON.parse(guardado);
+            if (parsed.tema === "dark" || parsed.tema === "light") prefUI.tema = parsed.tema;
+            if (typeof parsed.altoContraste === "boolean") prefUI.altoContraste = parsed.altoContraste;
+            if (parsed.idioma === "es" || parsed.idioma === "en") prefUI.idioma = parsed.idioma;
+            if (ESCALAS_WEB.includes(String(parsed.escala))) prefUI.escala = String(parsed.escala);
+        }
     } catch {
-        // Ignoramos si el navegador restringe localStorage en modo incógnito.
+        // Ignora errores de acceso a sessionStorage.
+    }
+}
+
+function aplicarPreferenciasUI() {
+    const root = document.documentElement;
+    root.lang = prefUI.idioma;
+    root.setAttribute("data-theme", prefUI.tema);
+    root.setAttribute("data-contrast", prefUI.altoContraste ? "high" : "normal");
+    root.setAttribute("data-scale", prefUI.escala);
+
+    const btnIdioma = document.getElementById("btn-pref-idioma");
+    const btnTema = document.getElementById("btn-pref-tema");
+    const btnHC = document.getElementById("btn-pref-hc");
+
+    if (btnIdioma) btnIdioma.textContent = tWeb("btn_idioma");
+    if (btnTema) {
+        btnTema.textContent = prefUI.tema === "light" ? tWeb("btn_tema_oscuro") : tWeb("btn_tema_claro");
+        btnTema.setAttribute("aria-pressed", String(prefUI.tema === "dark"));
+    }
+    if (btnHC) {
+        btnHC.classList.toggle("activo", prefUI.altoContraste);
+        btnHC.setAttribute("aria-pressed", String(prefUI.altoContraste));
+    }
+
+    // Traducción declarativa de textos y placeholders en todo el DOM.
+    document.querySelectorAll("[data-i18n]").forEach(el => {
+        el.textContent = tWeb(el.getAttribute("data-i18n"));
+    });
+    document.querySelectorAll("[data-i18n-ph]").forEach(el => {
+        el.setAttribute("placeholder", tWeb(el.getAttribute("data-i18n-ph")));
+    });
+
+    // Traducción de opciones visibles en selects preservando values canónicos.
+    traducirSelectRolesEstatico("emp-rol");
+    if (sesionActiva.id) {
+        configurarComboRolesUsuarios(true);
+        actualizarEncabezadosSesion();
+    }
+
+    // Actualiza mensajes dinámicos de Login, Consola, Facturación y BI.
+    const infoIntentos = document.getElementById("login-intentos-info");
+    if (infoIntentos) {
+        const restantes = 3 - intentosFallidosLogin;
+        infoIntentos.textContent = restantes > 0 ? tWeb("login_intentos", { n: restantes }) : tWeb("login_bloqueado");
+    }
+
+    actualizarEstadoSQLVisual();
+    actualizarEtiquetasTotalesFactura(totalAcumuladoFacturacion, porcentajeGlobalActivo);
+
+    // Re-renderiza tablas activas en RAM para actualizar idioma y etiquetas.
+    if (cacheUsuarios.length > 0) renderizarTablaUsuarios();
+    if (cacheEmpleados.length > 0) renderizarTablaEmpleados();
+    if (cacheClientes.length > 0) renderizarTablaClientes();
+    if (cacheProveedores.length > 0) renderizarTablaProveedores();
+    if (cacheProductos.length > 0) renderizarTablaStock();
+    if (cacheFacturas.length > 0) renderizarTablaFacturacion();
+    if (cacheRegistrosBI.length > 0) {
+        renderizarTablaBI();
+        actualizarSubtituloBI();
+    }
+
+    // Redibuja los 3 gráficos BI con los colores del tema activo.
+    const vistaBI = document.getElementById("vista-analitica");
+    if (vistaBI && vistaBI.classList.contains("activa")) {
+        redibujarGraficosBI();
+    }
+}
+
+function traducirSelectRolesEstatico(idSelect) {
+    const sel = document.getElementById(idSelect);
+    if (!sel) return;
+    Array.from(sel.options).forEach(opt => {
+        if (!opt.value) {
+            opt.textContent = tWeb("sel_rol");
+        } else {
+            opt.textContent = rolAUI(opt.value);
+        }
+    });
+}
+
+function actualizarEncabezadosSesion() {
+    if (!sesionActiva.id) return;
+    const nombreCompleto = `${sesionActiva.nombres} ${sesionActiva.apellidos}`.toUpperCase();
+    const rolVis = rolAUI(sesionActiva.rol);
+    document.getElementById("panel-saludo").textContent = tWeb("panel_saludo", { nombre: nombreCompleto });
+    document.getElementById("panel-rol").textContent = tWeb("panel_sub", { rol: rolVis });
+    document.getElementById("info-operador-activo").textContent =
+        `${sesionActiva.nombres} ${sesionActiva.apellidos} (${rolVis})`;
+}
+
+function alternarIdiomaWeb() {
+    prefUI.idioma = prefUI.idioma === "es" ? "en" : "es";
+    guardarPreferenciasSesion();
+    aplicarPreferenciasUI();
+}
+
+function alternarTemaWeb() {
+    prefUI.tema = prefUI.tema === "light" ? "dark" : "light";
+    guardarPreferenciasSesion();
+    aplicarPreferenciasUI();
+}
+
+function alternarAltoContrasteWeb() {
+    prefUI.altoContraste = !prefUI.altoContraste;
+    guardarPreferenciasSesion();
+    aplicarPreferenciasUI();
+}
+
+function ajustarEscalaWeb(delta) {
+    const idxActual = ESCALAS_WEB.indexOf(prefUI.escala);
+    const nuevoIdx = Math.max(0, Math.min(ESCALAS_WEB.length - 1, idxActual + delta));
+    if (nuevoIdx !== idxActual) {
+        prefUI.escala = ESCALAS_WEB[nuevoIdx];
+        guardarPreferenciasSesion();
+        aplicarPreferenciasUI();
     }
 }
 
 
-
-// =======================================================================
-//  1. CLIENTE HTTP ASÍNCRONO CENTRALIZADO (EQUIVALENTE A CLIENTE_API.PY)
-// =======================================================================
+// ==============================================================================
+//  2. CLIENTE HTTP ASÍNCRONO CENTRALIZADO (EQUIVALENTE A CLIENTE_API.PY)
+// ==============================================================================
 
 async function peticionAPI(ruta, metodo = "GET", cuerpo = null) {
     const cabeceras = {
@@ -75,8 +730,8 @@ async function peticionAPI(ruta, metodo = "GET", cuerpo = null) {
     let respuesta;
     try {
         respuesta = await fetch(`${URL_BASE_API}${ruta}`, opciones);
-    } catch (errorRed) {
-        throw new Error(`No se pudo conectar con el servidor Backend en ${URL_BASE_API}. Verificá que el sistema esté iniciado.`);
+    } catch {
+        throw new Error(`No se pudo conectar con el servidor Backend en ${URL_BASE_API}.`);
     }
 
     let datos = null;
@@ -90,7 +745,6 @@ async function peticionAPI(ruta, metodo = "GET", cuerpo = null) {
         return datos;
     }
 
-    // Extraemos el mensaje de error enviado por el Dominio ('detalle') o por FastAPI ('detail').
     let mensajeError = "Error desconocido en el servidor.";
     if (datos) {
         if (typeof datos.detalle === "string") {
@@ -105,10 +759,9 @@ async function peticionAPI(ruta, metodo = "GET", cuerpo = null) {
 }
 
 
-
-// ========================================================================
-//  2. SISTEMA DE CUADROS DE DIÁLOGO (EQUIVALENTE A MESSAGEBOX DE TKINTER)
-// ========================================================================
+// ==============================================================================
+//  3. SISTEMA DE CUADROS DE DIÁLOGO (EQUIVALENTE A MESSAGEBOX)
+// ==============================================================================
 
 function mostrarAlerta(titulo, mensaje, tipo = "info") {
     const modal = document.getElementById("modal-alerta");
@@ -120,6 +773,7 @@ function mostrarAlerta(titulo, mensaje, tipo = "info") {
     txtTitulo.textContent = titulo;
     txtMensaje.textContent = mensaje;
     modal.classList.remove("oculto");
+    document.getElementById("btn-cerrar-modal").focus();
 }
 
 function cerrarAlerta() {
@@ -127,10 +781,9 @@ function cerrarAlerta() {
 }
 
 
-
-// ============================================================
-//  3. NAVEGACIÓN ENTRE VISTAS (SPA) Y MATRIZ DE PERMISOS RBAC
-// ============================================================
+// ==============================================================================
+//  4. NAVEGACIÓN ENTRE VISTAS (SPA) Y MATRIZ DE PERMISOS RBAC
+// ==============================================================================
 
 function navegarA(idVista) {
     document.querySelectorAll(".vista-app").forEach(seccion => {
@@ -142,13 +795,17 @@ function navegarA(idVista) {
         vistaDestino.classList.add("activa");
     }
 
-    const barraSuperior = document.getElementById("barra-superior");
+    const infoOp = document.getElementById("info-operador-activo");
+    const badgeServ = document.getElementById("badge-servidor");
     const btnVolverTop = document.getElementById("btn-volver-panel-top");
 
     if (idVista === "vista-login") {
-        barraSuperior.classList.add("oculto");
+        infoOp.classList.add("oculto");
+        badgeServ.classList.add("oculto");
+        btnVolverTop.classList.add("oculto");
     } else {
-        barraSuperior.classList.remove("oculto");
+        infoOp.classList.remove("oculto");
+        badgeServ.classList.remove("oculto");
         if (idVista === "vista-panel") {
             btnVolverTop.classList.add("oculto");
         } else {
@@ -163,27 +820,34 @@ async function abrirModulo(idVista) {
     navegarA(idVista);
 
     if (idVista === "vista-usuarios") {
-        configurarComboRolesUsuarios();
+        configurarComboRolesUsuarios(false);
         limpiarFormularioUsuarios();
+        document.getElementById("buscar-usuarios").value = "";
         await cargarDatosUsuarios();
     } else if (idVista === "vista-empleados") {
         limpiarFormularioEmpleados();
+        document.getElementById("buscar-empleados").value = "";
         await cargarDatosEmpleados();
     } else if (idVista === "vista-clientes") {
         limpiarFormularioClientes();
+        document.getElementById("buscar-clientes").value = "";
         await cargarDatosClientes();
     } else if (idVista === "vista-proveedores") {
         limpiarFormularioProveedores();
+        document.getElementById("buscar-proveedores").value = "";
         await cargarDatosProveedores();
     } else if (idVista === "vista-stock") {
         limpiarFormularioStock();
+        document.getElementById("buscar-stock").value = "";
         await cargarDatosStock();
     } else if (idVista === "vista-facturacion") {
         limpiarFormularioFacturacion();
+        document.getElementById("buscar-facturacion").value = "";
         await cargarDatosFacturacion();
     } else if (idVista === "vista-consola") {
         limpiarConsolaSQL();
     } else if (idVista === "vista-analitica") {
+        document.getElementById("buscar-bi").value = "";
         await cargarDatosAnalitica();
     }
 }
@@ -210,10 +874,9 @@ function aplicarMatrizRBACPanel(rolUsuario) {
 }
 
 
-
-// =======================================
-//  4. MÓDULO DE LOGIN Y CIERRE DE SESIÓN
-// =======================================
+// ==============================================================================
+//  5. MÓDULO DE LOGIN, CIERRE DE SESIÓN Y BACKUP JSON
+// ==============================================================================
 
 async function validarIngreso(evento) {
     evento.preventDefault();
@@ -227,7 +890,7 @@ async function validarIngreso(evento) {
     const password = inputPassword.value;
 
     if (!usuario || !password) {
-        mostrarAlerta("Validación", "Completá todos los campos.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("login_completar"), "warning");
         return;
     }
 
@@ -238,7 +901,7 @@ async function validarIngreso(evento) {
         });
 
         intentosFallidosLogin = 0;
-        infoIntentos.textContent = "Intentos disponibles: 3";
+        infoIntentos.textContent = tWeb("login_intentos", { n: 3 });
 
         sesionActiva = {
             id: datosPerfil.id,
@@ -251,17 +914,21 @@ async function validarIngreso(evento) {
         inputUsuario.value = "";
         inputPassword.value = "";
 
-        // Configuramos encabezados del Panel de Control.
-        const nombreCompleto = `${datosPerfil.nombres} ${datosPerfil.apellidos}`.toUpperCase();
-        document.getElementById("panel-saludo").textContent = `BIENVENIDO/A, ${nombreCompleto}`;
-        document.getElementById("panel-rol").textContent = `Rol Activo: ${datosPerfil.rol}`;
-        document.getElementById("info-operador-activo").textContent = `${datosPerfil.nombres} ${datosPerfil.apellidos} (${datosPerfil.rol})`;
-
+        document.getElementById("badge-servidor").textContent = `API ${HOST_LAN}:8000`;
+        actualizarEncabezadosSesion();
         aplicarMatrizRBACPanel(datosPerfil.rol);
         navegarA("vista-panel");
-        mostrarAlerta("Acceso Concedido", `Bienvenido/a, ${datosPerfil.nombres} ${datosPerfil.apellidos}.\nRol: ${datosPerfil.rol}`, "info");
 
-    } catch (error) {
+        mostrarAlerta(
+            tWeb("login_ok_tit"),
+            tWeb("login_ok_msg", {
+                nombre: datosPerfil.nombres,
+                apellido: datosPerfil.apellidos,
+                rol: rolAUI(datosPerfil.rol)
+            }),
+            "info"
+        );
+    } catch {
         intentosFallidosLogin += 1;
         const restantes = 3 - intentosFallidosLogin;
 
@@ -270,22 +937,14 @@ async function validarIngreso(evento) {
         inputUsuario.focus();
 
         if (restantes > 0) {
-            infoIntentos.textContent = `Intentos disponibles: ${restantes}`;
-            mostrarAlerta(
-                "Error de Autenticación",
-                `Credenciales incorrectas o usuario inhabilitado. Intentos restantes: ${restantes}`,
-                "error"
-            );
+            infoIntentos.textContent = tWeb("login_intentos", { n: restantes });
+            mostrarAlerta(tWeb("login_err_tit"), tWeb("login_err_msg", { n: restantes }), "error");
         } else {
-            infoIntentos.textContent = "Acceso bloqueado por seguridad.";
+            infoIntentos.textContent = tWeb("login_bloqueado");
             inputUsuario.disabled = true;
             inputPassword.disabled = true;
             btnIngresar.disabled = true;
-            mostrarAlerta(
-                "Bloqueo de Seguridad",
-                "Superaste el límite de intentos fallidos. Recargá la página o contactá al Administrador.",
-                "error"
-            );
+            mostrarAlerta(tWeb("login_bloq_tit"), tWeb("login_bloq_msg"), "error");
         }
     }
 }
@@ -314,29 +973,32 @@ async function generarBackupWeb() {
         const urlDescarga = URL.createObjectURL(blob);
         const enlace = document.createElement("a");
         const marcaTiempo = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const nombreArchivo = `backup_frankie_${marcaTiempo}.json`;
 
         enlace.href = urlDescarga;
-        enlace.download = `backup_frankie_${marcaTiempo}.json`;
+        enlace.download = nombreArchivo;
         document.body.appendChild(enlace);
         enlace.click();
         document.body.removeChild(enlace);
         URL.revokeObjectURL(urlDescarga);
 
-        mostrarAlerta("Backup Exitoso", `Copia de seguridad descargada en tu dispositivo como:\nbackup_frankie_${marcaTiempo}.json`, "info");
+        mostrarAlerta(tWeb("bkp_ok_tit"), tWeb("bkp_ok_msg", { archivo: nombreArchivo }), "info");
     } catch (error) {
-        mostrarAlerta("Error de Backup", `Fallo al generar la copia: ${error.message}`, "error");
+        mostrarAlerta(tWeb("bkp_err_tit"), error.message, "error");
     }
 }
 
 
+// ==============================================================================
+//  6. MÓDULO DE GESTIÓN DE USUARIOS (IAM)
+// ==============================================================================
 
-// ==================================
-//  5. MÓDULO DE GESTIÓN DE USUARIOS
-// ==================================
-
-function configurarComboRolesUsuarios() {
+function configurarComboRolesUsuarios(conservarSeleccion = false) {
     const selectRol = document.getElementById("usu-rol");
-    selectRol.innerHTML = '<option value="">Seleccione un rol...</option>';
+    if (!selectRol) return;
+    const valorPrevio = conservarSeleccion ? selectRol.value : "";
+
+    selectRol.innerHTML = `<option value="">${tWeb("sel_rol")}</option>`;
 
     let rolesPermitidos = ["Empleado - Ventas", "Empleado - Compras"];
     if (sesionActiva.rol === "Administrador") {
@@ -346,9 +1008,11 @@ function configurarComboRolesUsuarios() {
     rolesPermitidos.forEach(rol => {
         const opt = document.createElement("option");
         opt.value = rol;
-        opt.textContent = rol;
+        opt.textContent = rolAUI(rol);
         selectRol.appendChild(opt);
     });
+
+    if (valorPrevio) selectRol.value = valorPrevio;
 }
 
 function limpiarFormularioUsuarios() {
@@ -361,40 +1025,52 @@ function limpiarFormularioUsuarios() {
     desmarcarFilasTabla("tabla-usuarios");
 }
 
-async function cargarDatosUsuarios() {
+function renderizarTablaUsuarios() {
     const tbody = document.querySelector("#tabla-usuarios tbody");
+    const filtro = (document.getElementById("buscar-usuarios").value || "").trim().toLowerCase();
     tbody.innerHTML = "";
+    let visibles = 0;
 
+    cacheUsuarios.forEach(p => {
+        const usuarioMostrar = p.usuario ? p.usuario : tWeb("sin_cred");
+        const rolVis = rolAUI(p.rol);
+        const texto = `${p.id} ${usuarioMostrar} ${rolVis} ${p.rol} ${p.nombres} ${p.apellidos}`.toLowerCase();
+        if (filtro && !texto.includes(filtro)) return;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${p.id}</td>
+            <td>${usuarioMostrar}</td>
+            <td>${rolVis}</td>
+            <td>${p.nombres}</td>
+            <td>${p.apellidos}</td>
+        `;
+
+        tr.addEventListener("click", () => {
+            marcarFilaSeleccionada("tabla-usuarios", tr);
+            document.getElementById("usu-id-seleccionado").value = p.id;
+            document.getElementById("usu-usuario").value = p.usuario || "";
+            document.getElementById("usu-rol").value = p.rol;
+            document.getElementById("usu-nombres").value = p.nombres;
+            document.getElementById("usu-apellidos").value = p.apellidos;
+            document.getElementById("usu-password").value = "";
+        });
+
+        tbody.appendChild(tr);
+        visibles += 1;
+    });
+
+    document.getElementById("contador-usuarios").textContent =
+        tWeb("contador_filas", { visibles, total: cacheUsuarios.length });
+}
+
+async function cargarDatosUsuarios() {
     try {
         const perfiles = await peticionAPI("/api/perfiles");
-        perfiles.forEach(p => {
-            if (!["Cliente", "Proveedor"].includes(p.rol)) {
-                const tr = document.createElement("tr");
-                const usuarioMostrar = p.usuario ? p.usuario : "[Sin Credenciales]";
-
-                tr.innerHTML = `
-                    <td>${p.id}</td>
-                    <td>${usuarioMostrar}</td>
-                    <td>${p.rol}</td>
-                    <td>${p.nombres}</td>
-                    <td>${p.apellidos}</td>
-                `;
-
-                tr.addEventListener("click", () => {
-                    marcarFilaSeleccionada("tabla-usuarios", tr);
-                    document.getElementById("usu-id-seleccionado").value = p.id;
-                    document.getElementById("usu-usuario").value = usuarioMostrar;
-                    document.getElementById("usu-rol").value = p.rol;
-                    document.getElementById("usu-nombres").value = p.nombres;
-                    document.getElementById("usu-apellidos").value = p.apellidos;
-                    document.getElementById("usu-password").value = "";
-                });
-
-                tbody.appendChild(tr);
-            }
-        });
+        cacheUsuarios = perfiles.filter(p => !["Cliente", "Proveedor"].includes(p.rol));
+        renderizarTablaUsuarios();
     } catch (error) {
-        mostrarAlerta("Error de Comunicación", error.message, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
     }
 }
 
@@ -406,12 +1082,12 @@ async function guardarUsuario() {
     const rol = document.getElementById("usu-rol").value;
 
     if (!nombres || !apellidos || !usuario || !password || !rol) {
-        mostrarAlerta("Validación", "Todos los campos son obligatorios en este módulo.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("usu_todos_req"), "warning");
         return;
     }
 
     if (sesionActiva.rol === "Gerente" && ["Administrador", "Gerente"].includes(rol)) {
-        mostrarAlerta("Acceso Denegado", "Privilegios insuficientes para crear perfiles de esta jerarquía.", "error");
+        mostrarAlerta(tWeb("err_acc_tit"), tWeb("usu_priv_err"), "error");
         limpiarFormularioUsuarios();
         return;
     }
@@ -428,14 +1104,14 @@ async function guardarUsuario() {
         limpiarFormularioUsuarios();
         await cargarDatosUsuarios();
     } catch (error) {
-        mostrarAlerta("Error al Guardar", error.message, "error");
+        mostrarAlerta(tWeb("err_gua_tit"), error.message, "error");
     }
 }
 
 async function modificarUsuario() {
     const idDestino = document.getElementById("usu-id-seleccionado").value;
     if (!idDestino) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un usuario de la tabla para modificarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("usu_sel_req"), "warning");
         return;
     }
 
@@ -446,28 +1122,26 @@ async function modificarUsuario() {
     const rol = document.getElementById("usu-rol").value;
 
     if (!nombres || !apellidos || !usuario || !rol) {
-        mostrarAlerta("Validación", "Nombres, Apellidos, Usuario y Rol son obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("usu_mod_req"), "warning");
         return;
     }
 
     const payload = { nombres, apellidos, rol, usuario };
-    if (password) {
-        payload.password_plana = password;
-    }
+    if (password) payload.password_plana = password;
 
     try {
         await peticionAPI(`/api/perfiles/${idDestino}`, "PUT", payload);
         limpiarFormularioUsuarios();
         await cargarDatosUsuarios();
     } catch (error) {
-        mostrarAlerta("Acceso Denegado / Error", error.message, "error");
+        mostrarAlerta(tWeb("err_acc_err_tit"), error.message, "error");
     }
 }
 
 async function eliminarUsuario() {
     const idDestino = document.getElementById("usu-id-seleccionado").value;
     if (!idDestino) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un usuario de la tabla para eliminarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("usu_sel_req"), "warning");
         return;
     }
 
@@ -476,15 +1150,14 @@ async function eliminarUsuario() {
         limpiarFormularioUsuarios();
         await cargarDatosUsuarios();
     } catch (error) {
-        mostrarAlerta("Operación Bloqueada", error.message, "error");
+        mostrarAlerta(tWeb("err_bloq_tit"), error.message, "error");
     }
 }
 
 
-
-// ===========================================
-//  6. MÓDULO DE RECURSOS HUMANOS (EMPLEADOS)
-// ===========================================
+// ==============================================================================
+//  7. MÓDULO DE RECURSOS HUMANOS (EMPLEADOS — PERSISTENCIA 3FN)
+// ==============================================================================
 
 function limpiarFormularioEmpleados() {
     document.getElementById("emp-id-seleccionado").value = "";
@@ -495,64 +1168,73 @@ function limpiarFormularioEmpleados() {
     desmarcarFilasTabla("tabla-empleados");
 }
 
-async function cargarDatosEmpleados() {
+function renderizarTablaEmpleados() {
     const tbody = document.querySelector("#tabla-empleados tbody");
+    const filtro = (document.getElementById("buscar-empleados").value || "").trim().toLowerCase();
     tbody.innerHTML = "";
-    const cacheRRHH = obtenerCacheLocal("cache_rrhh");
+    let visibles = 0;
 
+    cacheEmpleados.forEach(p => {
+        const fila = {
+            nombres: valorVisual(p.nombres),
+            apellidos: valorVisual(p.apellidos),
+            dni: valorVisual(p.dni),
+            telefono: valorVisual(p.telefono),
+            email: valorVisual(p.email),
+            direccion: valorVisual(p.direccion),
+            ciudad: valorVisual(p.ciudad),
+            provincia: valorVisual(p.provincia),
+            cp: valorVisual(p.cp),
+            rolVis: rolAUI(p.rol)
+        };
+        const texto = `${p.id} ${Object.values(fila).join(" ")} ${p.rol || ""}`.toLowerCase();
+        if (filtro && !texto.includes(filtro)) return;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${p.id}</td>
+            <td>${fila.nombres}</td>
+            <td>${fila.apellidos}</td>
+            <td>${fila.dni}</td>
+            <td>${fila.telefono}</td>
+            <td>${fila.email}</td>
+            <td>${fila.direccion}</td>
+            <td>${fila.ciudad}</td>
+            <td>${fila.provincia}</td>
+            <td>${fila.cp}</td>
+            <td>${fila.rolVis}</td>
+        `;
+
+        tr.addEventListener("click", () => {
+            marcarFilaSeleccionada("tabla-empleados", tr);
+            document.getElementById("emp-id-seleccionado").value = p.id;
+            document.getElementById("emp-nombres").value = p.nombres && p.nombres !== "S/D" ? p.nombres : "";
+            document.getElementById("emp-apellidos").value = p.apellidos && p.apellidos !== "S/D" ? p.apellidos : "";
+            document.getElementById("emp-dni").value = p.dni && p.dni !== "S/D" ? p.dni : "";
+            document.getElementById("emp-telefono").value = p.telefono && p.telefono !== "S/D" ? p.telefono : "";
+            document.getElementById("emp-email").value = p.email && p.email !== "S/D" ? p.email : "";
+            document.getElementById("emp-direccion").value = p.direccion && p.direccion !== "S/D" ? p.direccion : "";
+            document.getElementById("emp-ciudad").value = p.ciudad && p.ciudad !== "S/D" ? p.ciudad : "";
+            document.getElementById("emp-provincia").value = p.provincia && p.provincia !== "S/D" ? p.provincia : "";
+            document.getElementById("emp-cp").value = p.cp && p.cp !== "S/D" ? p.cp : "";
+            document.getElementById("emp-rol").value = p.rol || "";
+        });
+
+        tbody.appendChild(tr);
+        visibles += 1;
+    });
+
+    document.getElementById("contador-empleados").textContent =
+        tWeb("contador_filas", { visibles, total: cacheEmpleados.length });
+}
+
+async function cargarDatosEmpleados() {
     try {
         const perfiles = await peticionAPI("/api/perfiles");
-        perfiles.forEach(p => {
-            if (!["Cliente", "Proveedor"].includes(p.rol)) {
-                const extras = cacheRRHH[p.id] || {};
-                const fila = {
-                    nombres: p.nombres || "S/D",
-                    apellidos: p.apellidos || "S/D",
-                    dni: p.dni || "S/D",
-                    telefono: extras.telefono || "S/D",
-                    email: extras.email || "S/D",
-                    direccion: extras.direccion || "S/D",
-                    ciudad: extras.ciudad || "S/D",
-                    provincia: extras.provincia || "S/D",
-                    cp: extras.cp || "S/D",
-                    rol: p.rol || "S/D"
-                };
-
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${p.id}</td>
-                    <td>${fila.nombres}</td>
-                    <td>${fila.apellidos}</td>
-                    <td>${fila.dni}</td>
-                    <td>${fila.telefono}</td>
-                    <td>${fila.email}</td>
-                    <td>${fila.direccion}</td>
-                    <td>${fila.ciudad}</td>
-                    <td>${fila.provincia}</td>
-                    <td>${fila.cp}</td>
-                    <td>${fila.rol}</td>
-                `;
-
-                tr.addEventListener("click", () => {
-                    marcarFilaSeleccionada("tabla-empleados", tr);
-                    document.getElementById("emp-id-seleccionado").value = p.id;
-                    document.getElementById("emp-nombres").value = fila.nombres !== "S/D" ? fila.nombres : "";
-                    document.getElementById("emp-apellidos").value = fila.apellidos !== "S/D" ? fila.apellidos : "";
-                    document.getElementById("emp-dni").value = fila.dni !== "S/D" ? fila.dni : "";
-                    document.getElementById("emp-telefono").value = fila.telefono !== "S/D" ? fila.telefono : "";
-                    document.getElementById("emp-email").value = fila.email !== "S/D" ? fila.email : "";
-                    document.getElementById("emp-direccion").value = fila.direccion !== "S/D" ? fila.direccion : "";
-                    document.getElementById("emp-ciudad").value = fila.ciudad !== "S/D" ? fila.ciudad : "";
-                    document.getElementById("emp-provincia").value = fila.provincia !== "S/D" ? fila.provincia : "";
-                    document.getElementById("emp-cp").value = fila.cp !== "S/D" ? fila.cp : "";
-                    document.getElementById("emp-rol").value = fila.rol;
-                });
-
-                tbody.appendChild(tr);
-            }
-        });
+        cacheEmpleados = perfiles.filter(p => !["Cliente", "Proveedor"].includes(p.rol));
+        renderizarTablaEmpleados();
     } catch (error) {
-        mostrarAlerta("Error de Comunicación", error.message, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
     }
 }
 
@@ -569,34 +1251,32 @@ async function guardarEmpleado() {
     const rol = document.getElementById("emp-rol").value;
 
     if (!nombres || !apellidos || !rol) {
-        mostrarAlerta("Validación", "Nombres, Apellidos y Rol Organizacional son obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("emp_req"), "warning");
         return;
     }
 
     if (sesionActiva.rol === "Gerente" && ["Administrador", "Gerente"].includes(rol)) {
-        mostrarAlerta("Acceso Denegado", "Privilegios insuficientes para crear perfiles de esta jerarquía organizativa.", "error");
+        mostrarAlerta(tWeb("err_acc_tit"), tWeb("emp_priv_err"), "error");
         limpiarFormularioEmpleados();
         return;
     }
 
     try {
-        const res = await peticionAPI("/api/perfiles", "POST", { nombres, apellidos, dni, rol });
-        if (res && res.id) {
-            const cacheRRHH = obtenerCacheLocal("cache_rrhh");
-            cacheRRHH[res.id] = { telefono, email, direccion, ciudad, provincia, cp };
-            guardarCacheLocal("cache_rrhh", cacheRRHH);
-        }
+        await peticionAPI("/api/perfiles", "POST", {
+            nombres, apellidos, dni, rol,
+            telefono, email, direccion, ciudad, provincia, cp
+        });
         limpiarFormularioEmpleados();
         await cargarDatosEmpleados();
     } catch (error) {
-        mostrarAlerta("Error de Transacción", error.message, "error");
+        mostrarAlerta(tWeb("err_tx_tit"), error.message, "error");
     }
 }
 
 async function modificarEmpleado() {
     const idEmpleado = document.getElementById("emp-id-seleccionado").value;
     if (!idEmpleado) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un empleado de la tabla para modificarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("emp_sel_req"), "warning");
         return;
     }
 
@@ -612,27 +1292,26 @@ async function modificarEmpleado() {
     const rol = document.getElementById("emp-rol").value;
 
     if (!nombres || !apellidos || !rol) {
-        mostrarAlerta("Validación", "Nombres, Apellidos y Rol Organizacional son obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("emp_req"), "warning");
         return;
     }
 
     try {
-        await peticionAPI(`/api/perfiles/${idEmpleado}`, "PUT", { nombres, apellidos, dni, rol });
-        const cacheRRHH = obtenerCacheLocal("cache_rrhh");
-        cacheRRHH[idEmpleado] = { telefono, email, direccion, ciudad, provincia, cp };
-        guardarCacheLocal("cache_rrhh", cacheRRHH);
-
+        await peticionAPI(`/api/perfiles/${idEmpleado}`, "PUT", {
+            nombres, apellidos, dni, rol,
+            telefono, email, direccion, ciudad, provincia, cp
+        });
         limpiarFormularioEmpleados();
         await cargarDatosEmpleados();
     } catch (error) {
-        mostrarAlerta("Acceso Denegado / Error", error.message, "error");
+        mostrarAlerta(tWeb("err_acc_err_tit"), error.message, "error");
     }
 }
 
 async function eliminarEmpleado() {
     const idEmpleado = document.getElementById("emp-id-seleccionado").value;
     if (!idEmpleado) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un empleado de la tabla para eliminarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("emp_sel_req"), "warning");
         return;
     }
 
@@ -641,15 +1320,14 @@ async function eliminarEmpleado() {
         limpiarFormularioEmpleados();
         await cargarDatosEmpleados();
     } catch (error) {
-        mostrarAlerta("Operación Bloqueada", error.message, "error");
+        mostrarAlerta(tWeb("err_bloq_tit"), error.message, "error");
     }
 }
 
 
-
-// ==================================
-//  7. MÓDULO DE GESTIÓN DE CLIENTES
-// ==================================
+// ==============================================================================
+//  8. MÓDULO DE GESTIÓN DE CLIENTES (PERSISTENCIA 3FN)
+// ==============================================================================
 
 function limpiarFormularioClientes() {
     document.getElementById("cli-id-seleccionado").value = "";
@@ -660,59 +1338,69 @@ function limpiarFormularioClientes() {
     desmarcarFilasTabla("tabla-clientes");
 }
 
-async function cargarDatosClientes() {
+function renderizarTablaClientes() {
     const tbody = document.querySelector("#tabla-clientes tbody");
+    const filtro = (document.getElementById("buscar-clientes").value || "").trim().toLowerCase();
     tbody.innerHTML = "";
-    const cacheCli = obtenerCacheLocal("cache_clientes");
+    let visibles = 0;
 
-    try {
-        const clientes = await peticionAPI("/api/perfiles/rol/Cliente");
-        clientes.forEach(c => {
-            const extras = cacheCli[c.id] || {};
-            const fila = {
-                nombres: c.nombres || "S/D",
-                apellidos: c.apellidos || "S/D",
-                dni: c.dni || "S/D",
-                telefono: extras.telefono || "S/D",
-                email: extras.email || "S/D",
-                direccion: extras.direccion || "S/D",
-                ciudad: extras.ciudad || "S/D",
-                provincia: extras.provincia || "S/D",
-                cp: extras.cp || "S/D"
-            };
+    cacheClientes.forEach(c => {
+        const fila = {
+            nombres: valorVisual(c.nombres),
+            apellidos: valorVisual(c.apellidos),
+            dni: valorVisual(c.dni),
+            telefono: valorVisual(c.telefono),
+            email: valorVisual(c.email),
+            direccion: valorVisual(c.direccion),
+            ciudad: valorVisual(c.ciudad),
+            provincia: valorVisual(c.provincia),
+            cp: valorVisual(c.cp)
+        };
+        const texto = `${c.id} ${Object.values(fila).join(" ")}`.toLowerCase();
+        if (filtro && !texto.includes(filtro)) return;
 
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${c.id}</td>
-                <td>${fila.nombres}</td>
-                <td>${fila.apellidos}</td>
-                <td>${fila.dni}</td>
-                <td>${fila.telefono}</td>
-                <td>${fila.email}</td>
-                <td>${fila.direccion}</td>
-                <td>${fila.ciudad}</td>
-                <td>${fila.provincia}</td>
-                <td>${fila.cp}</td>
-            `;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${c.id}</td>
+            <td>${fila.nombres}</td>
+            <td>${fila.apellidos}</td>
+            <td>${fila.dni}</td>
+            <td>${fila.telefono}</td>
+            <td>${fila.email}</td>
+            <td>${fila.direccion}</td>
+            <td>${fila.ciudad}</td>
+            <td>${fila.provincia}</td>
+            <td>${fila.cp}</td>
+        `;
 
-            tr.addEventListener("click", () => {
-                marcarFilaSeleccionada("tabla-clientes", tr);
-                document.getElementById("cli-id-seleccionado").value = c.id;
-                document.getElementById("cli-nombres").value = fila.nombres !== "S/D" ? fila.nombres : "";
-                document.getElementById("cli-apellidos").value = fila.apellidos !== "S/D" ? fila.apellidos : "";
-                document.getElementById("cli-dni").value = fila.dni !== "S/D" ? fila.dni : "";
-                document.getElementById("cli-telefono").value = fila.telefono !== "S/D" ? fila.telefono : "";
-                document.getElementById("cli-email").value = fila.email !== "S/D" ? fila.email : "";
-                document.getElementById("cli-direccion").value = fila.direccion !== "S/D" ? fila.direccion : "";
-                document.getElementById("cli-ciudad").value = fila.ciudad !== "S/D" ? fila.ciudad : "";
-                document.getElementById("cli-provincia").value = fila.provincia !== "S/D" ? fila.provincia : "";
-                document.getElementById("cli-cp").value = fila.cp !== "S/D" ? fila.cp : "";
-            });
-
-            tbody.appendChild(tr);
+        tr.addEventListener("click", () => {
+            marcarFilaSeleccionada("tabla-clientes", tr);
+            document.getElementById("cli-id-seleccionado").value = c.id;
+            document.getElementById("cli-nombres").value = c.nombres && c.nombres !== "S/D" ? c.nombres : "";
+            document.getElementById("cli-apellidos").value = c.apellidos && c.apellidos !== "S/D" ? c.apellidos : "";
+            document.getElementById("cli-dni").value = c.dni && c.dni !== "S/D" ? c.dni : "";
+            document.getElementById("cli-telefono").value = c.telefono && c.telefono !== "S/D" ? c.telefono : "";
+            document.getElementById("cli-email").value = c.email && c.email !== "S/D" ? c.email : "";
+            document.getElementById("cli-direccion").value = c.direccion && c.direccion !== "S/D" ? c.direccion : "";
+            document.getElementById("cli-ciudad").value = c.ciudad && c.ciudad !== "S/D" ? c.ciudad : "";
+            document.getElementById("cli-provincia").value = c.provincia && c.provincia !== "S/D" ? c.provincia : "";
+            document.getElementById("cli-cp").value = c.cp && c.cp !== "S/D" ? c.cp : "";
         });
+
+        tbody.appendChild(tr);
+        visibles += 1;
+    });
+
+    document.getElementById("contador-clientes").textContent =
+        tWeb("contador_filas", { visibles, total: cacheClientes.length });
+}
+
+async function cargarDatosClientes() {
+    try {
+        cacheClientes = await peticionAPI("/api/perfiles/rol/Cliente");
+        renderizarTablaClientes();
     } catch (error) {
-        mostrarAlerta("Error de Comunicación", error.message, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
     }
 }
 
@@ -728,33 +1416,26 @@ async function guardarCliente() {
     const cp = document.getElementById("cli-cp").value.trim() || "S/D";
 
     if (!nombres || !apellidos) {
-        mostrarAlerta("Validación", "Nombres y Apellidos son obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("cli_req"), "warning");
         return;
     }
 
     try {
-        const res = await peticionAPI("/api/perfiles", "POST", {
-            nombres,
-            apellidos,
-            dni,
-            rol: "Cliente"
+        await peticionAPI("/api/perfiles", "POST", {
+            nombres, apellidos, dni, rol: "Cliente",
+            telefono, email, direccion, ciudad, provincia, cp
         });
-        if (res && res.id) {
-            const cacheCli = obtenerCacheLocal("cache_clientes");
-            cacheCli[res.id] = { telefono, email, direccion, ciudad, provincia, cp };
-            guardarCacheLocal("cache_clientes", cacheCli);
-        }
         limpiarFormularioClientes();
         await cargarDatosClientes();
     } catch (error) {
-        mostrarAlerta("Error de Transacción", error.message, "error");
+        mostrarAlerta(tWeb("err_tx_tit"), error.message, "error");
     }
 }
 
 async function modificarCliente() {
     const idCliente = document.getElementById("cli-id-seleccionado").value;
     if (!idCliente) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un cliente de la tabla para modificarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("cli_sel_req"), "warning");
         return;
     }
 
@@ -769,32 +1450,26 @@ async function modificarCliente() {
     const cp = document.getElementById("cli-cp").value.trim() || "S/D";
 
     if (!nombres || !apellidos) {
-        mostrarAlerta("Validación", "Nombres y Apellidos son obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("cli_req"), "warning");
         return;
     }
 
     try {
         await peticionAPI(`/api/perfiles/${idCliente}`, "PUT", {
-            nombres,
-            apellidos,
-            dni,
-            rol: "Cliente"
+            nombres, apellidos, dni, rol: "Cliente",
+            telefono, email, direccion, ciudad, provincia, cp
         });
-        const cacheCli = obtenerCacheLocal("cache_clientes");
-        cacheCli[idCliente] = { telefono, email, direccion, ciudad, provincia, cp };
-        guardarCacheLocal("cache_clientes", cacheCli);
-
         limpiarFormularioClientes();
         await cargarDatosClientes();
     } catch (error) {
-        mostrarAlerta("Error al Actualizar", error.message, "error");
+        mostrarAlerta(tWeb("err_act_tit"), error.message, "error");
     }
 }
 
 async function eliminarCliente() {
     const idCliente = document.getElementById("cli-id-seleccionado").value;
     if (!idCliente) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un cliente de la tabla para eliminarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("cli_sel_req"), "warning");
         return;
     }
 
@@ -803,15 +1478,14 @@ async function eliminarCliente() {
         limpiarFormularioClientes();
         await cargarDatosClientes();
     } catch (error) {
-        mostrarAlerta("Operación Bloqueada", error.message, "error");
+        mostrarAlerta(tWeb("err_bloq_tit"), error.message, "error");
     }
 }
 
 
-
-// =====================================
-//  8. MÓDULO DE GESTIÓN DE PROVEEDORES
-// =====================================
+// ==============================================================================
+//  9. MÓDULO DE GESTIÓN DE PROVEEDORES (PERSISTENCIA 3FN)
+// ==============================================================================
 
 function limpiarFormularioProveedores() {
     document.getElementById("prov-id-seleccionado").value = "";
@@ -822,59 +1496,69 @@ function limpiarFormularioProveedores() {
     desmarcarFilasTabla("tabla-proveedores");
 }
 
-async function cargarDatosProveedores() {
+function renderizarTablaProveedores() {
     const tbody = document.querySelector("#tabla-proveedores tbody");
+    const filtro = (document.getElementById("buscar-proveedores").value || "").trim().toLowerCase();
     tbody.innerHTML = "";
-    const cacheProv = obtenerCacheLocal("cache_proveedores");
+    let visibles = 0;
 
-    try {
-        const proveedores = await peticionAPI("/api/perfiles/rol/Proveedor");
-        proveedores.forEach(p => {
-            const extras = cacheProv[p.id] || {};
-            const fila = {
-                razonSocial: p.nombres || "S/D",
-                cuit: p.dni || "S/D",
-                telefono: extras.telefono || "S/D",
-                email: extras.email || "S/D",
-                direccion: extras.direccion || "S/D",
-                ciudad: extras.ciudad || "S/D",
-                provincia: extras.provincia || "S/D",
-                cp: extras.cp || "S/D",
-                contacto: p.apellidos || "S/D"
-            };
+    cacheProveedores.forEach(p => {
+        const fila = {
+            razonSocial: valorVisual(p.nombres),
+            cuit: valorVisual(p.dni),
+            telefono: valorVisual(p.telefono),
+            email: valorVisual(p.email),
+            direccion: valorVisual(p.direccion),
+            ciudad: valorVisual(p.ciudad),
+            provincia: valorVisual(p.provincia),
+            cp: valorVisual(p.cp),
+            contacto: valorVisual(p.apellidos)
+        };
+        const texto = `${p.id} ${Object.values(fila).join(" ")}`.toLowerCase();
+        if (filtro && !texto.includes(filtro)) return;
 
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${p.id}</td>
-                <td>${fila.razonSocial}</td>
-                <td>${fila.cuit}</td>
-                <td>${fila.telefono}</td>
-                <td>${fila.email}</td>
-                <td>${fila.direccion}</td>
-                <td>${fila.ciudad}</td>
-                <td>${fila.provincia}</td>
-                <td>${fila.cp}</td>
-                <td>${fila.contacto}</td>
-            `;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${p.id}</td>
+            <td>${fila.razonSocial}</td>
+            <td>${fila.cuit}</td>
+            <td>${fila.telefono}</td>
+            <td>${fila.email}</td>
+            <td>${fila.direccion}</td>
+            <td>${fila.ciudad}</td>
+            <td>${fila.provincia}</td>
+            <td>${fila.cp}</td>
+            <td>${fila.contacto}</td>
+        `;
 
-            tr.addEventListener("click", () => {
-                marcarFilaSeleccionada("tabla-proveedores", tr);
-                document.getElementById("prov-id-seleccionado").value = p.id;
-                document.getElementById("prov-razon-social").value = fila.razonSocial !== "S/D" ? fila.razonSocial : "";
-                document.getElementById("prov-cuit").value = fila.cuit !== "S/D" ? fila.cuit : "";
-                document.getElementById("prov-telefono").value = fila.telefono !== "S/D" ? fila.telefono : "";
-                document.getElementById("prov-email").value = fila.email !== "S/D" ? fila.email : "";
-                document.getElementById("prov-direccion").value = fila.direccion !== "S/D" ? fila.direccion : "";
-                document.getElementById("prov-ciudad").value = fila.ciudad !== "S/D" ? fila.ciudad : "";
-                document.getElementById("prov-provincia").value = fila.provincia !== "S/D" ? fila.provincia : "";
-                document.getElementById("prov-cp").value = fila.cp !== "S/D" ? fila.cp : "";
-                document.getElementById("prov-contacto").value = fila.contacto !== "S/D" ? fila.contacto : "";
-            });
-
-            tbody.appendChild(tr);
+        tr.addEventListener("click", () => {
+            marcarFilaSeleccionada("tabla-proveedores", tr);
+            document.getElementById("prov-id-seleccionado").value = p.id;
+            document.getElementById("prov-razon-social").value = p.nombres && p.nombres !== "S/D" ? p.nombres : "";
+            document.getElementById("prov-cuit").value = p.dni && p.dni !== "S/D" ? p.dni : "";
+            document.getElementById("prov-telefono").value = p.telefono && p.telefono !== "S/D" ? p.telefono : "";
+            document.getElementById("prov-email").value = p.email && p.email !== "S/D" ? p.email : "";
+            document.getElementById("prov-direccion").value = p.direccion && p.direccion !== "S/D" ? p.direccion : "";
+            document.getElementById("prov-ciudad").value = p.ciudad && p.ciudad !== "S/D" ? p.ciudad : "";
+            document.getElementById("prov-provincia").value = p.provincia && p.provincia !== "S/D" ? p.provincia : "";
+            document.getElementById("prov-cp").value = p.cp && p.cp !== "S/D" ? p.cp : "";
+            document.getElementById("prov-contacto").value = p.apellidos && p.apellidos !== "S/D" ? p.apellidos : "";
         });
+
+        tbody.appendChild(tr);
+        visibles += 1;
+    });
+
+    document.getElementById("contador-proveedores").textContent =
+        tWeb("contador_filas", { visibles, total: cacheProveedores.length });
+}
+
+async function cargarDatosProveedores() {
+    try {
+        cacheProveedores = await peticionAPI("/api/perfiles/rol/Proveedor");
+        renderizarTablaProveedores();
     } catch (error) {
-        mostrarAlerta("Error de Comunicación", error.message, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
     }
 }
 
@@ -890,33 +1574,29 @@ async function guardarProveedor() {
     const contacto = document.getElementById("prov-contacto").value.trim() || "S/D";
 
     if (!razonSocial) {
-        mostrarAlerta("Validación", "La Razón Social es obligatoria.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("prov_req"), "warning");
         return;
     }
 
     try {
-        const res = await peticionAPI("/api/perfiles", "POST", {
+        await peticionAPI("/api/perfiles", "POST", {
             nombres: razonSocial,
             apellidos: contacto,
             dni: cuit,
-            rol: "Proveedor"
+            rol: "Proveedor",
+            telefono, email, direccion, ciudad, provincia, cp
         });
-        if (res && res.id) {
-            const cacheProv = obtenerCacheLocal("cache_proveedores");
-            cacheProv[res.id] = { telefono, email, direccion, ciudad, provincia, cp };
-            guardarCacheLocal("cache_proveedores", cacheProv);
-        }
         limpiarFormularioProveedores();
         await cargarDatosProveedores();
     } catch (error) {
-        mostrarAlerta("Error de Transacción", error.message, "error");
+        mostrarAlerta(tWeb("err_tx_tit"), error.message, "error");
     }
 }
 
 async function modificarProveedor() {
     const idProveedor = document.getElementById("prov-id-seleccionado").value;
     if (!idProveedor) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un proveedor de la tabla para modificarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("prov_sel_req"), "warning");
         return;
     }
 
@@ -931,7 +1611,7 @@ async function modificarProveedor() {
     const contacto = document.getElementById("prov-contacto").value.trim() || "S/D";
 
     if (!razonSocial) {
-        mostrarAlerta("Validación", "La Razón Social es obligatoria.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("prov_req"), "warning");
         return;
     }
 
@@ -940,23 +1620,20 @@ async function modificarProveedor() {
             nombres: razonSocial,
             apellidos: contacto,
             dni: cuit,
-            rol: "Proveedor"
+            rol: "Proveedor",
+            telefono, email, direccion, ciudad, provincia, cp
         });
-        const cacheProv = obtenerCacheLocal("cache_proveedores");
-        cacheProv[idProveedor] = { telefono, email, direccion, ciudad, provincia, cp };
-        guardarCacheLocal("cache_proveedores", cacheProv);
-
         limpiarFormularioProveedores();
         await cargarDatosProveedores();
     } catch (error) {
-        mostrarAlerta("Error al Actualizar", error.message, "error");
+        mostrarAlerta(tWeb("err_act_tit"), error.message, "error");
     }
 }
 
 async function eliminarProveedor() {
     const idProveedor = document.getElementById("prov-id-seleccionado").value;
     if (!idProveedor) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un proveedor de la tabla para eliminarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("prov_sel_req"), "warning");
         return;
     }
 
@@ -965,15 +1642,14 @@ async function eliminarProveedor() {
         limpiarFormularioProveedores();
         await cargarDatosProveedores();
     } catch (error) {
-        mostrarAlerta("Operación Bloqueada", error.message, "error");
+        mostrarAlerta(tWeb("err_bloq_tit"), error.message, "error");
     }
 }
 
 
-
-// ============================================
-//  9. MÓDULO DE CONTROL DE STOCK E INVENTARIO
-// ============================================
+// ==============================================================================
+//  10. MÓDULO DE CONTROL DE STOCK E INVENTARIO (3FN + SEMÁFORO DE STOCK)
+// ==============================================================================
 
 function limpiarFormularioStock() {
     document.getElementById("stk-id-seleccionado").value = "";
@@ -985,16 +1661,74 @@ function limpiarFormularioStock() {
     desmarcarFilasTabla("tabla-stock");
 }
 
-async function cargarDatosStock() {
+function renderizarTablaStock() {
     const tbody = document.querySelector("#tabla-stock tbody");
-    const selectProv = document.getElementById("stk-proveedor");
+    const filtro = (document.getElementById("buscar-stock").value || "").trim().toLowerCase();
     tbody.innerHTML = "";
-    selectProv.innerHTML = '<option value="">Seleccione proveedor...</option>';
+    let visibles = 0;
+
+    cacheProductos.forEach(prod => {
+        const nombreProv = mapaProveedoresIdANombre[prod.id_proveedor] || `ID ${prod.id_proveedor}`;
+        const ubicacion = valorVisual(prod.ubicacion);
+        const vencimiento = valorVisual(prod.vencimiento);
+        const categoria = valorVisual(prod.categoria);
+        const stAct = Number(prod.stock_actual || 0);
+        const stMin = Number(prod.stock_minimo || 0);
+
+        const texto = `${prod.id} ${prod.codigo} ${prod.descripcion} ${categoria} ${nombreProv} ${ubicacion} ${vencimiento}`.toLowerCase();
+        if (filtro && !texto.includes(filtro)) return;
+
+        const tr = document.createElement("tr");
+        if (stAct <= 0) {
+            tr.classList.add("fila-stock-agotado");
+        } else if (stAct <= stMin) {
+            tr.classList.add("fila-stock-bajo");
+        }
+
+        tr.innerHTML = `
+            <td>${prod.id}</td>
+            <td>${prod.codigo}</td>
+            <td>${prod.descripcion}</td>
+            <td>${categoria}</td>
+            <td>${nombreProv}</td>
+            <td>${prod.stock_actual}</td>
+            <td>${prod.stock_minimo}</td>
+            <td>$ ${Number(prod.precio_costo).toFixed(2)}</td>
+            <td>$ ${Number(prod.precio_venta).toFixed(2)}</td>
+            <td>${ubicacion}</td>
+            <td>${vencimiento}</td>
+        `;
+
+        tr.addEventListener("click", () => {
+            marcarFilaSeleccionada("tabla-stock", tr);
+            document.getElementById("stk-id-seleccionado").value = prod.id;
+            document.getElementById("stk-codigo").value = prod.codigo;
+            document.getElementById("stk-descripcion").value = prod.descripcion;
+            document.getElementById("stk-categoria").value = prod.categoria && prod.categoria !== "S/D" ? prod.categoria : "";
+            document.getElementById("stk-proveedor").value = nombreProv;
+            document.getElementById("stk-actual").value = prod.stock_actual;
+            document.getElementById("stk-minimo").value = prod.stock_minimo;
+            document.getElementById("stk-costo").value = prod.precio_costo;
+            document.getElementById("stk-venta").value = prod.precio_venta;
+            document.getElementById("stk-ubicacion").value = prod.ubicacion && prod.ubicacion !== "S/D" ? prod.ubicacion : "";
+            document.getElementById("stk-vencimiento").value = prod.vencimiento && prod.vencimiento !== "S/D" ? prod.vencimiento : "";
+        });
+
+        tbody.appendChild(tr);
+        visibles += 1;
+    });
+
+    document.getElementById("contador-stock").textContent =
+        tWeb("contador_filas", { visibles, total: cacheProductos.length });
+}
+
+async function cargarDatosStock() {
+    const selectProv = document.getElementById("stk-proveedor");
+    selectProv.innerHTML = `<option value="">${tWeb("stk_sel_prov")}</option>`;
 
     mapaProveedoresNombreAId = {};
     mapaProveedoresIdANombre = {};
-    cacheStockAnterior = {};
-    const cacheUbicaciones = obtenerCacheLocal("cache_ubicaciones_stock");
+    stockPrevioPorId = {};
 
     try {
         const [proveedores, productos] = await Promise.all([
@@ -1015,45 +1749,12 @@ async function cargarDatosStock() {
         });
 
         productos.forEach(prod => {
-            cacheStockAnterior[prod.id] = Number(prod.stock_actual || 0);
-            const nombreProv = mapaProveedoresIdANombre[prod.id_proveedor] || `ID ${prod.id_proveedor}`;
-            const ubicacion = cacheUbicaciones[prod.id] || "S/D";
-            const vencimiento = prod.vencimiento || "S/D";
-
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${prod.id}</td>
-                <td>${prod.codigo}</td>
-                <td>${prod.descripcion}</td>
-                <td>${prod.categoria || "S/D"}</td>
-                <td>${nombreProv}</td>
-                <td>${prod.stock_actual}</td>
-                <td>${prod.stock_minimo}</td>
-                <td>$ ${Number(prod.precio_costo).toFixed(2)}</td>
-                <td>$ ${Number(prod.precio_venta).toFixed(2)}</td>
-                <td>${ubicacion}</td>
-                <td>${vencimiento}</td>
-            `;
-
-            tr.addEventListener("click", () => {
-                marcarFilaSeleccionada("tabla-stock", tr);
-                document.getElementById("stk-id-seleccionado").value = prod.id;
-                document.getElementById("stk-codigo").value = prod.codigo;
-                document.getElementById("stk-descripcion").value = prod.descripcion;
-                document.getElementById("stk-categoria").value = prod.categoria !== "S/D" ? prod.categoria : "";
-                document.getElementById("stk-proveedor").value = nombreProv;
-                document.getElementById("stk-actual").value = prod.stock_actual;
-                document.getElementById("stk-minimo").value = prod.stock_minimo;
-                document.getElementById("stk-costo").value = prod.precio_costo;
-                document.getElementById("stk-venta").value = prod.precio_venta;
-                document.getElementById("stk-ubicacion").value = ubicacion !== "S/D" ? ubicacion : "";
-                document.getElementById("stk-vencimiento").value = vencimiento !== "S/D" ? vencimiento : "";
-            });
-
-            tbody.appendChild(tr);
+            stockPrevioPorId[prod.id] = Number(prod.stock_actual || 0);
         });
+        cacheProductos = productos;
+        renderizarTablaStock();
     } catch (error) {
-        mostrarAlerta("Error de Comunicación", error.message, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
     }
 }
 
@@ -1070,13 +1771,13 @@ async function guardarProducto() {
     const vencimiento = document.getElementById("stk-vencimiento").value.trim() || "S/D";
 
     if (!codigo || !descripcion || !proveedor) {
-        mostrarAlerta("Validación", "Código, Descripción y Proveedor son campos obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("stk_req"), "warning");
         return;
     }
 
     const idProveedor = mapaProveedoresNombreAId[proveedor];
     if (!idProveedor) {
-        mostrarAlerta("Error", "El proveedor seleccionado no es válido o fue dado de baja.", "error");
+        mostrarAlerta(tWeb("err_tx_tit"), tWeb("stk_prov_inv"), "error");
         return;
     }
 
@@ -1086,12 +1787,12 @@ async function guardarProducto() {
     const precioVenta = ventaStr ? Number(ventaStr) : 0.0;
 
     if ([stockActual, stockMinimo, precioCosto, precioVenta].some(isNaN)) {
-        mostrarAlerta("Error de Formato", "Asegúrese de ingresar valores numéricos válidos en precios y stock.", "error");
+        mostrarAlerta(tWeb("err_fmt_tit"), tWeb("stk_nums_err"), "error");
         return;
     }
 
     try {
-        const res = await peticionAPI("/api/productos", "POST", {
+        await peticionAPI("/api/productos", "POST", {
             codigo,
             descripcion,
             categoria,
@@ -1100,26 +1801,20 @@ async function guardarProducto() {
             precio_venta: precioVenta,
             stock_actual: stockActual,
             stock_minimo: stockMinimo,
+            ubicacion,
             vencimiento
         });
-
-        if (res && res.id) {
-            const cacheUbicaciones = obtenerCacheLocal("cache_ubicaciones_stock");
-            cacheUbicaciones[res.id] = ubicacion;
-            guardarCacheLocal("cache_ubicaciones_stock", cacheUbicaciones);
-        }
-
         limpiarFormularioStock();
         await cargarDatosStock();
     } catch (error) {
-        mostrarAlerta("Error Transaccional", error.message, "error");
+        mostrarAlerta(tWeb("err_tx_tit"), error.message, "error");
     }
 }
 
 async function modificarProducto() {
     const idProducto = document.getElementById("stk-id-seleccionado").value;
     if (!idProducto) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un producto de la tabla para modificarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("stk_sel_req"), "warning");
         return;
     }
 
@@ -1135,13 +1830,13 @@ async function modificarProducto() {
     const vencimiento = document.getElementById("stk-vencimiento").value.trim() || "S/D";
 
     if (!codigo || !descripcion || !proveedor) {
-        mostrarAlerta("Validación", "Código, Descripción y Proveedor son campos obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("stk_req"), "warning");
         return;
     }
 
     const idProveedor = mapaProveedoresNombreAId[proveedor];
     if (!idProveedor) {
-        mostrarAlerta("Error", "El proveedor seleccionado no es válido o fue dado de baja.", "error");
+        mostrarAlerta(tWeb("err_tx_tit"), tWeb("stk_prov_inv"), "error");
         return;
     }
 
@@ -1151,7 +1846,7 @@ async function modificarProducto() {
     const precioVenta = ventaStr ? Number(ventaStr) : 0.0;
 
     if ([stockActual, stockMinimo, precioCosto, precioVenta].some(isNaN)) {
-        mostrarAlerta("Error de Formato", "Asegúrese de ingresar valores numéricos válidos en precios y stock.", "error");
+        mostrarAlerta(tWeb("err_fmt_tit"), tWeb("stk_nums_err"), "error");
         return;
     }
 
@@ -1164,30 +1859,27 @@ async function modificarProducto() {
             precio_costo: precioCosto,
             precio_venta: precioVenta,
             stock_minimo: stockMinimo,
+            ubicacion,
             vencimiento
         });
 
-        const stockPrevio = Number(cacheStockAnterior[idProducto] || 0);
+        const stockPrevio = Number(stockPrevioPorId[idProducto] || 0);
         const diferencia = stockActual - stockPrevio;
         if (Math.abs(diferencia) > 1e-6) {
             await peticionAPI(`/api/productos/${idProducto}/stock`, "POST", { cantidad: diferencia });
         }
 
-        const cacheUbicaciones = obtenerCacheLocal("cache_ubicaciones_stock");
-        cacheUbicaciones[idProducto] = ubicacion;
-        guardarCacheLocal("cache_ubicaciones_stock", cacheUbicaciones);
-
         limpiarFormularioStock();
         await cargarDatosStock();
     } catch (error) {
-        mostrarAlerta("Error Transaccional", error.message, "error");
+        mostrarAlerta(tWeb("err_tx_tit"), error.message, "error");
     }
 }
 
 async function eliminarProducto() {
     const idProducto = document.getElementById("stk-id-seleccionado").value;
     if (!idProducto) {
-        mostrarAlerta("Selección Requerida", "Tocá primero un producto de la tabla para eliminarlo.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("stk_sel_req"), "warning");
         return;
     }
 
@@ -1196,17 +1888,14 @@ async function eliminarProducto() {
         limpiarFormularioStock();
         await cargarDatosStock();
     } catch (error) {
-        mostrarAlerta("Operación Bloqueada", error.message, "error");
+        mostrarAlerta(tWeb("err_bloq_tit"), error.message, "error");
     }
 }
 
 
-
-// =====================================================
-//  10. MÓDULO DE FACTURACIÓN Y OPERACIONES COMERCIALES
-// =====================================================
-
-let facturaSeleccionadaCache = null;
+// ==============================================================================
+//  11. MÓDULO DE FACTURACIÓN Y OPERACIONES COMERCIALES
+// ==============================================================================
 
 function limpiarFormularioFacturacion() {
     document.getElementById("fac-id-seleccionado").value = "";
@@ -1231,19 +1920,69 @@ function autocompletarPrecioFactura() {
     }
 }
 
+function renderizarTablaFacturacion() {
+    const tbody = document.querySelector("#tabla-facturacion tbody");
+    const filtro = (document.getElementById("buscar-facturacion").value || "").trim().toLowerCase();
+    tbody.innerHTML = "";
+    let visibles = 0;
+
+    cacheFacturas.forEach(f => {
+        const prod = mapaProductosIdAObj[f.id_producto];
+        const etiquetaProd = prod ? `${prod.codigo} - ${prod.descripcion}` : `ID ${f.id_producto}`;
+        const totalFila = f.total !== null && f.total !== undefined
+            ? Number(f.total)
+            : (Number(f.cantidad) * Number(f.valor)) * (1.0 - (Number(f.descuento || 0) / 100.0));
+
+        const texto = `${f.id} ${etiquetaProd} ${f.cantidad} ${f.valor} ${f.descuento} ${totalFila.toFixed(2)}`.toLowerCase();
+        if (filtro && !texto.includes(filtro)) return;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${f.id}</td>
+            <td>${etiquetaProd}</td>
+            <td>${f.cantidad}</td>
+            <td>$ ${Number(f.valor).toFixed(2)}</td>
+            <td>${f.descuento}%</td>
+            <td>$ ${totalFila.toFixed(2)}</td>
+        `;
+
+        tr.addEventListener("click", () => {
+            marcarFilaSeleccionada("tabla-facturacion", tr);
+            document.getElementById("fac-id-seleccionado").value = f.id;
+            document.getElementById("fac-producto").value = etiquetaProd;
+            document.getElementById("fac-cantidad").value = f.cantidad;
+            document.getElementById("fac-valor").value = f.valor;
+            document.getElementById("fac-descuento").value = f.descuento;
+            facturaSeleccionadaCache = {
+                id: f.id,
+                id_vendedor: f.id_vendedor,
+                id_cliente: f.id_cliente,
+                id_producto: f.id_producto,
+                etiquetaProd: etiquetaProd,
+                cantidad: Number(f.cantidad),
+                descuento: Number(f.descuento || 0)
+            };
+        });
+
+        tbody.appendChild(tr);
+        visibles += 1;
+    });
+
+    document.getElementById("contador-facturacion").textContent =
+        tWeb("contador_filas", { visibles, total: cacheFacturas.length });
+}
+
 async function cargarDatosFacturacion() {
     const selVendedor = document.getElementById("fac-vendedor");
     const selCliente = document.getElementById("fac-cliente");
     const selProducto = document.getElementById("fac-producto");
-    const tbody = document.querySelector("#tabla-facturacion tbody");
 
     const vendedorPrevio = selVendedor.value;
     const clientePrevio = selCliente.value;
 
-    selVendedor.innerHTML = '<option value="">Seleccione vendedor...</option>';
-    selCliente.innerHTML = '<option value="">Seleccione cliente...</option>';
-    selProducto.innerHTML = '<option value="">Seleccione producto...</option>';
-    tbody.innerHTML = "";
+    selVendedor.innerHTML = `<option value="">${tWeb("fac_sel_vend")}</option>`;
+    selCliente.innerHTML = `<option value="">${tWeb("fac_sel_cli")}</option>`;
+    selProducto.innerHTML = `<option value="">${tWeb("fac_sel_prod")}</option>`;
 
     mapaProductosCodigoAObj = {};
     mapaProductosIdAObj = {};
@@ -1285,55 +2024,29 @@ async function cargarDatosFacturacion() {
             selProducto.appendChild(opt);
         });
 
-        let granTotal = 0.0;
-
-        facturas.forEach(f => {
-            const prod = mapaProductosIdAObj[f.id_producto];
-            const etiquetaProd = prod ? `${prod.codigo} - ${prod.descripcion}` : `ID ${f.id_producto}`;
-            const totalFila = f.total !== null && f.total !== undefined
+        cacheFacturas = facturas;
+        totalAcumuladoFacturacion = facturas.reduce((acc, f) => {
+            const t = f.total !== null && f.total !== undefined
                 ? Number(f.total)
                 : (Number(f.cantidad) * Number(f.valor)) * (1.0 - (Number(f.descuento || 0) / 100.0));
+            return acc + t;
+        }, 0.0);
 
-            granTotal += totalFila;
-
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${f.id}</td>
-                <td>${etiquetaProd}</td>
-                <td>${f.cantidad}</td>
-                <td>$ ${Number(f.valor).toFixed(2)}</td>
-                <td>${f.descuento}%</td>
-                <td>$ ${totalFila.toFixed(2)}</td>
-            `;
-
-            tr.addEventListener("click", () => {
-                marcarFilaSeleccionada("tabla-facturacion", tr);
-                document.getElementById("fac-id-seleccionado").value = f.id;
-                document.getElementById("fac-producto").value = etiquetaProd;
-                document.getElementById("fac-cantidad").value = f.cantidad;
-                document.getElementById("fac-valor").value = f.valor;
-                document.getElementById("fac-descuento").value = f.descuento;
-                facturaSeleccionadaCache = {
-                    id: f.id,
-                    etiquetaProd: etiquetaProd,
-                    cantidad: Number(f.cantidad)
-                };
-            });
-
-            tbody.appendChild(tr);
-        });
-
-        actualizarEtiquetasTotalesFactura(granTotal, 0);
+        renderizarTablaFacturacion();
+        actualizarEtiquetasTotalesFactura(totalAcumuladoFacturacion, 0);
     } catch (error) {
-        mostrarAlerta("Error de Comunicación", error.message, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
     }
 }
 
 function actualizarEtiquetasTotalesFactura(granTotal, porcentajeGlobal = 0) {
+    porcentajeGlobalActivo = porcentajeGlobal;
     const totalFinal = granTotal * (1.0 - (porcentajeGlobal / 100.0));
-    document.getElementById("fac-total-general").textContent = `TOTAL FACTURA: $ ${totalFinal.toFixed(2)}`;
-    document.getElementById("fac-total-con-descuento").textContent =
-        `Total con descuento (${porcentajeGlobal}%): $ ${totalFinal.toFixed(2)}`;
+    const montoFmt = formatearMoneda(totalFinal);
+    const elTotal = document.getElementById("fac-total-general");
+    const elDesc = document.getElementById("fac-total-con-descuento");
+    if (elTotal) elTotal.textContent = tWeb("fac_total", { monto: montoFmt });
+    if (elDesc) elDesc.textContent = tWeb("fac_total_desc", { pct: porcentajeGlobal, monto: montoFmt });
 }
 
 function calcularDescuentoGlobal() {
@@ -1342,17 +2055,11 @@ function calcularDescuentoGlobal() {
     const porcentaje = valorStr ? Number(valorStr) : 0.0;
 
     if (isNaN(porcentaje) || porcentaje < 0 || porcentaje > 100) {
-        mostrarAlerta("Validación", "El descuento global debe estar entre 0 y 100%.", "error");
+        mostrarAlerta(tWeb("val_tit"), tWeb("fac_desc_rango"), "error");
         return;
     }
 
-    let sumaTabla = 0.0;
-    document.querySelectorAll("#tabla-facturacion tbody tr").forEach(tr => {
-        const textoTotal = tr.children[5].textContent.replace("$", "").trim();
-        sumaTabla += Number(textoTotal || 0);
-    });
-
-    actualizarEtiquetasTotalesFactura(sumaTabla, porcentaje);
+    actualizarEtiquetasTotalesFactura(totalAcumuladoFacturacion, porcentaje);
     inputGlobal.value = "";
 }
 
@@ -1370,7 +2077,7 @@ async function guardarFactura() {
     const descuentoStr = document.getElementById("fac-descuento").value.trim();
 
     if (!vendedorSel || !clienteSel || !productoSel) {
-        mostrarAlerta("Validación", "Vendedor, Cliente y Producto son obligatorios.", "warning");
+        mostrarAlerta(tWeb("val_tit"), tWeb("fac_req"), "warning");
         return;
     }
 
@@ -1378,12 +2085,12 @@ async function guardarFactura() {
     const descuento = descuentoStr ? Number(descuentoStr) : 0.0;
 
     if (isNaN(cantidad) || cantidad <= 0 || isNaN(descuento)) {
-        mostrarAlerta("Error de Formato", "Ingrese valores numéricos válidos en Cantidad y Descuento.", "error");
+        mostrarAlerta(tWeb("err_fmt_tit"), tWeb("fac_nums_err"), "error");
         return;
     }
 
     if (descuento < 0 || descuento > 100) {
-        mostrarAlerta("Validación", "El descuento por producto debe estar entre 0 y 100%.", "error");
+        mostrarAlerta(tWeb("val_tit"), tWeb("fac_rango_err"), "error");
         return;
     }
 
@@ -1393,7 +2100,7 @@ async function guardarFactura() {
     const prod = mapaProductosCodigoAObj[codigoProd];
 
     if (!idVendedor || !idCliente || !prod) {
-        mostrarAlerta("Error de Asociación", "Seleccione un vendedor, cliente y producto válidos del menú.", "error");
+        mostrarAlerta(tWeb("err_tx_tit"), tWeb("fac_asoc_err"), "error");
         return;
     }
 
@@ -1413,20 +2120,16 @@ async function guardarFactura() {
         await cargarDatosFacturacion();
 
         if (nuevoStock <= stockMinimo) {
-            mostrarAlerta(
-                "Alerta de Reposición",
-                `El producto llegó a su stock mínimo. Quedan ${Math.trunc(nuevoStock)} unidades.`,
-                "warning"
-            );
+            mostrarAlerta(tWeb("fac_rep_tit"), tWeb("fac_rep_msg", { u: Math.trunc(nuevoStock) }), "warning");
         }
     } catch (error) {
-        mostrarAlerta("Transacción Rechazada", error.message, "error");
+        mostrarAlerta(tWeb("err_tx_tit"), error.message, "error");
     }
 }
 
 async function modificarFactura() {
     if (!facturaSeleccionadaCache) {
-        mostrarAlerta("Selección Requerida", "Tocá primero una factura de la tabla para modificarla.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("fac_sel_req"), "warning");
         return;
     }
 
@@ -1435,97 +2138,101 @@ async function modificarFactura() {
     const productoNuevoSel = document.getElementById("fac-producto").value.trim();
     const cantidadNueva = Number(document.getElementById("fac-cantidad").value.trim());
     const descuentoStr = document.getElementById("fac-descuento").value.trim();
-    const descuento = descuentoStr ? Number(descuentoStr) : 0.0;
+    const descuentoNuevo = descuentoStr ? Number(descuentoStr) : 0.0;
 
     if (!vendedorSel || !clienteSel || !productoNuevoSel) {
-        mostrarAlerta("Error de Carga", "Vendedor, Cliente y Producto son obligatorios.", "error");
+        mostrarAlerta(tWeb("val_tit"), tWeb("fac_req"), "warning");
         return;
     }
 
-    if (isNaN(cantidadNueva) || cantidadNueva <= 0 || isNaN(descuento) || descuento < 0 || descuento > 100) {
-        mostrarAlerta("Validación", "Verificá que la Cantidad y el Descuento (0 a 100%) sean válidos.", "error");
+    if (isNaN(cantidadNueva) || cantidadNueva <= 0 || isNaN(descuentoNuevo) || descuentoNuevo < 0 || descuentoNuevo > 100) {
+        mostrarAlerta(tWeb("val_tit"), tWeb("fac_rango_err"), "error");
         return;
     }
 
     const idVendedor = extraerIdDeEtiqueta(vendedorSel);
     const idCliente = extraerIdDeEtiqueta(clienteSel);
-    const codigoViejo = facturaSeleccionadaCache.etiquetaProd.split(" - ")[0];
     const codigoNuevo = productoNuevoSel.split(" - ")[0];
-
-    const prodViejo = mapaProductosCodigoAObj[codigoViejo];
     const prodNuevo = mapaProductosCodigoAObj[codigoNuevo];
 
-    if (!prodViejo || !prodNuevo) {
-        mostrarAlerta("Error", "No se pudo identificar el producto en el catálogo.", "error");
+    if (!idVendedor || !idCliente || !prodNuevo) {
+        mostrarAlerta(tWeb("err_tx_tit"), tWeb("fac_asoc_err"), "error");
         return;
     }
 
+    const respaldoOriginal = { ...facturaSeleccionadaCache };
+
     try {
-        // 1. Restituimos el stock del comprobante anterior.
-        await peticionAPI(`/api/productos/${prodViejo.id}/stock`, "POST", {
-            cantidad: facturaSeleccionadaCache.cantidad
-        });
+        await peticionAPI(`/api/facturas/${respaldoOriginal.id}`, "DELETE");
 
         try {
-            // 2. Emitimos el nuevo comprobante.
             await peticionAPI("/api/facturas", "POST", {
                 id_vendedor: idVendedor,
                 id_cliente: idCliente,
                 id_producto: prodNuevo.id,
                 cantidad: cantidadNueva,
-                descuento: descuento
+                descuento: descuentoNuevo
             });
         } catch (errorEmision) {
-            // Si no alcanza el stock nuevo, revertimos la devolución previa.
-            await peticionAPI(`/api/productos/${prodViejo.id}/stock`, "POST", {
-                cantidad: -facturaSeleccionadaCache.cantidad
+            await peticionAPI("/api/facturas", "POST", {
+                id_vendedor: respaldoOriginal.id_vendedor || idVendedor,
+                id_cliente: respaldoOriginal.id_cliente || idCliente,
+                id_producto: respaldoOriginal.id_producto,
+                cantidad: respaldoOriginal.cantidad,
+                descuento: respaldoOriginal.descuento
             });
-            mostrarAlerta(
-                "Transacción Rechazada",
-                `No se pudo modificar la facturación (${errorEmision.message}). Se ha deshecho el cambio.`,
-                "error"
-            );
+            await cargarDatosFacturacion();
+            mostrarAlerta(tWeb("err_tx_tit"), errorEmision.message, "error");
             return;
         }
-
-        // 3. Anulamos el comprobante anterior reemplazado.
-        await peticionAPI(`/api/facturas/${facturaSeleccionadaCache.id}`, "DELETE");
 
         limpiarFormularioFacturacion();
         await cargarDatosFacturacion();
     } catch (error) {
-        mostrarAlerta("Error Transaccional", error.message, "error");
+        mostrarAlerta(tWeb("err_tx_tit"), error.message, "error");
     }
 }
 
 async function eliminarFactura() {
     if (!facturaSeleccionadaCache) {
-        mostrarAlerta("Selección Requerida", "Tocá primero una factura de la tabla para eliminarla.", "warning");
+        mostrarAlerta(tWeb("err_sel_tit"), tWeb("fac_sel_req"), "warning");
         return;
     }
 
     try {
-        const codigoProd = facturaSeleccionadaCache.etiquetaProd.split(" - ")[0];
-        const prod = mapaProductosCodigoAObj[codigoProd];
-        if (prod) {
-            await peticionAPI(`/api/productos/${prod.id}/stock`, "POST", {
-                cantidad: facturaSeleccionadaCache.cantidad
-            });
-        }
-
         await peticionAPI(`/api/facturas/${facturaSeleccionadaCache.id}`, "DELETE");
         limpiarFormularioFacturacion();
         await cargarDatosFacturacion();
     } catch (error) {
-        mostrarAlerta("Operación Bloqueada", error.message, "error");
+        mostrarAlerta(tWeb("err_bloq_tit"), error.message, "error");
     }
 }
 
 
+// ==============================================================================
+//  12. CONSOLA SQL DE AUDITORÍA (SANDBOX DE SOLO LECTURA EN NAVEGADOR)
+// ==============================================================================
 
-// =====================================================================
-//  11. CONSOLA SQL DE AUDITORÍA (SANDBOX DE SOLO LECTURA EN NAVEGADOR)
-// =====================================================================
+function actualizarEstadoSQLVisual() {
+    const labelEstado = document.getElementById("sql-estado");
+    if (!labelEstado) return;
+    const texto = estadoSQLMeta.textoLibre !== null
+        ? estadoSQLMeta.textoLibre
+        : tWeb(estadoSQLMeta.clave, estadoSQLMeta.kwargs);
+    labelEstado.textContent = texto;
+    if (estadoSQLMeta.tipo === "ok") {
+        labelEstado.style.color = "var(--color-verde)";
+    } else if (estadoSQLMeta.tipo === "error") {
+        labelEstado.style.color = "var(--color-rojo)";
+    } else {
+        labelEstado.style.color = "var(--texto-secundario)";
+    }
+}
+
+function setEstadoSQL(clave, tipo = "muted", kwargs = {}, textoLibre = null) {
+    estadoSQLMeta = { clave, kwargs, textoLibre, tipo };
+    actualizarEstadoSQLVisual();
+}
 
 function cargarEjemploSQL(sentencia) {
     document.getElementById("sql-query").value = sentencia;
@@ -1535,53 +2242,39 @@ function limpiarConsolaSQL() {
     document.getElementById("sql-query").value = "";
     document.querySelector("#tabla-sql thead").innerHTML = "";
     document.querySelector("#tabla-sql tbody").innerHTML = "";
-    const estado = document.getElementById("sql-estado");
-    estado.textContent = "Estado: Esperando consulta...";
-    estado.style.color = "#333333";
+    setEstadoSQL("sql_est_esp", "muted");
 }
 
 async function ejecutarConsultaSQL() {
     const queryCruda = document.getElementById("sql-query").value.trim();
-    const labelEstado = document.getElementById("sql-estado");
-
     if (!queryCruda) return;
 
-    // 1. Verificación RBAC contra la API REST antes de ejecutar.
     try {
         const perfilOperador = await peticionAPI(`/api/perfiles/${sesionActiva.id}`);
         if (perfilOperador.rol !== "Administrador") {
-            mostrarAlerta("Acceso Denegado", "Solo un Administrador activo puede ejecutar auditorías SQL.", "error");
-            labelEstado.textContent = "Estado: Bloqueado por falta de privilegios RBAC.";
-            labelEstado.style.color = "red";
+            mostrarAlerta(tWeb("err_acc_tit"), tWeb("sql_solo_admin"), "error");
+            setEstadoSQL("sql_est_rbac", "error");
             return;
         }
     } catch (error) {
-        mostrarAlerta("Error de Verificación", error.message, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
         return;
     }
 
-    // 2. Filtro Restrictivo de Solo Lectura (Sandboxing idéntico a consola.py).
     const patronProhibido = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|REPLACE|GRANT|REVOKE|ATTACH|DETACH|PRAGMA)\b/i;
     if (patronProhibido.test(queryCruda)) {
-        mostrarAlerta(
-            "Bloqueo de Seguridad",
-            "Transacción abortada. Operación destructiva detectada.\nEsta consola es de Solo Lectura (SELECT).",
-            "error"
-        );
-        labelEstado.textContent = "Estado: Query bloqueada por Sandboxing.";
-        labelEstado.style.color = "red";
+        mostrarAlerta(tWeb("sql_bloq_tit"), tWeb("sql_bloq_msg"), "error");
+        setEstadoSQL("sql_est_sbx", "error");
         return;
     }
 
     const queryLimpia = queryCruda.replace(/;$/, "").trim();
     if (!/^SELECT\b/i.test(queryLimpia)) {
-        labelEstado.textContent = "Error SQL: Solo se admiten sentencias que comiencen con SELECT.";
-        labelEstado.style.color = "red";
+        setEstadoSQL("sql_solo_sel", "error");
         return;
     }
 
     try {
-        // 3. Obtenemos los catálogos vivos desde la API REST para proyectar la consulta.
         const [usuarios, productos, facturacion] = await Promise.all([
             peticionAPI("/api/perfiles"),
             peticionAPI("/api/productos"),
@@ -1589,10 +2282,10 @@ async function ejecutarConsultaSQL() {
         ]);
 
         const tablasMemoria = {
-            usuarios: usuarios,
+            usuarios,
             perfiles: usuarios,
-            productos: productos,
-            facturacion: facturacion,
+            productos,
+            facturacion,
             facturas: facturacion,
             roles: [
                 { id: 1, rol: "Administrador", habilitado: 1 },
@@ -1617,31 +2310,25 @@ async function ejecutarConsultaSQL() {
 
         let filas = [...origenDatos];
 
-        // Evaluación opcional de LIMIT.
         const matchLimit = queryLimpia.match(/\bLIMIT\s+(\d+)/i);
         const limite = matchLimit ? Math.min(parseInt(matchLimit[1], 10), 1000) : 1000;
         filas = filas.slice(0, limite);
 
-        // Selección de columnas solicitadas.
         const matchCols = queryLimpia.match(/^SELECT\s+(.+?)\s+FROM\b/i);
         const colsRaw = matchCols ? matchCols[1].trim() : "*";
 
         let nombresColumnas = [];
         if (filas.length > 0) {
             const todasLasCols = Object.keys(filas[0]);
-            if (colsRaw === "*") {
-                nombresColumnas = todasLasCols;
-            } else {
-                nombresColumnas = colsRaw.split(",").map(c => c.trim().split(".").pop());
-            }
+            nombresColumnas = colsRaw === "*"
+                ? todasLasCols
+                : colsRaw.split(",").map(c => c.trim().split(".").pop());
         }
 
         renderizarGrillaSQL(nombresColumnas, filas);
-        labelEstado.textContent = `Estado: Ejecución exitosa. Filas recuperadas: ${filas.length}`;
-        labelEstado.style.color = "green";
+        setEstadoSQL("sql_est_ok", "ok", { n: filas.length });
     } catch (error) {
-        labelEstado.textContent = `Error SQL: ${error.message}`;
-        labelEstado.style.color = "red";
+        setEstadoSQL("sql_est_esp", "error", {}, `Error SQL: ${error.message}`);
     }
 }
 
@@ -1673,9 +2360,55 @@ function renderizarGrillaSQL(columnas, filas) {
 }
 
 
-// =========================================================================
-//  12. MÓDULO DE ANALÍTICA DE VENTAS (TABLERO BI - OLAP Y GRÁFICOS CANVAS)
-// =========================================================================
+// ==============================================================================
+//  13. MÓDULO DE ANALÍTICA DE VENTAS (BI / OLAP Y CANVAS ANTI-SUPERPOSICIÓN)
+// ==============================================================================
+
+function actualizarSubtituloBI() {
+    const elSub = document.getElementById("bi-subtitulo-estrella");
+    if (!elSub) return;
+    if (biEstrella.producto && biEstrella.categoria) {
+        elSub.textContent = tWeb("bi_sub_top", { prod: biEstrella.producto, cat: biEstrella.categoria });
+    } else if (cacheRegistrosBI.length === 0) {
+        elSub.textContent = tWeb("bi_sub_vacio");
+    } else {
+        elSub.textContent = tWeb("bi_sub_ini");
+    }
+}
+
+function renderizarTablaBI() {
+    const tbody = document.querySelector("#tabla-bi tbody");
+    const filtro = (document.getElementById("buscar-bi").value || "").trim().toLowerCase();
+    tbody.innerHTML = "";
+    let visibles = 0;
+
+    cacheRegistrosBI.forEach(r => {
+        const texto = `${r.id_venta} ${r.producto} ${r.categoria} ${r.fecha} ${r.facturacion.toFixed(2)}`.toLowerCase();
+        if (filtro && !texto.includes(filtro)) return;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${r.id_venta}</td>
+            <td>${r.producto}</td>
+            <td>${r.categoria}</td>
+            <td>$ ${formatearMoneda(r.precio)}</td>
+            <td>${r.cantidad}</td>
+            <td>${r.fecha}</td>
+            <td>$ ${formatearMoneda(r.facturacion)}</td>
+        `;
+        tbody.appendChild(tr);
+        visibles += 1;
+    });
+
+    document.getElementById("contador-bi").textContent =
+        tWeb("contador_filas", { visibles, total: cacheRegistrosBI.length });
+}
+
+function redibujarGraficosBI() {
+    dibujarGraficoBarras("canvas-bi-barras", cacheTop10BI);
+    dibujarGraficoLineas("canvas-bi-lineas", cacheMensualBI);
+    dibujarGraficoTorta("canvas-bi-torta", cacheCategoriasBI);
+}
 
 async function cargarDatosAnalitica() {
     try {
@@ -1685,9 +2418,7 @@ async function cargarDatosAnalitica() {
         ]);
 
         const mapaProd = {};
-        productos.forEach(p => {
-            mapaProd[p.id] = p;
-        });
+        productos.forEach(p => { mapaProd[p.id] = p; });
 
         const registros = facturas.map(f => {
             const prod = mapaProd[f.id_producto] || {};
@@ -1706,21 +2437,24 @@ async function cargarDatosAnalitica() {
             };
         }).sort((a, b) => a.fecha.localeCompare(b.fecha));
 
+        cacheRegistrosBI = registros;
+
         if (registros.length === 0) {
+            cacheTop10BI = [];
+            cacheMensualBI = [];
+            cacheCategoriasBI = [];
+            biEstrella = { producto: null, categoria: null };
             document.getElementById("kpi-facturacion").textContent = "$ 0.00";
             document.getElementById("kpi-operaciones").textContent = "0";
             document.getElementById("kpi-unidades").textContent = "0";
             document.getElementById("kpi-ticket").textContent = "$ 0.00";
-            document.getElementById("bi-subtitulo-estrella").textContent = "Sin ventas registradas para analizar";
-            document.querySelector("#tabla-bi tbody").innerHTML = "";
-            limpiarCanvas("canvas-bi-barras");
-            limpiarCanvas("canvas-bi-lineas");
-            limpiarCanvas("canvas-bi-torta");
-            mostrarAlerta("Información", "No hay ventas registradas para analizar.", "info");
+            actualizarSubtituloBI();
+            redibujarGraficosBI();
+            renderizarTablaBI();
+            mostrarAlerta(tWeb("val_tit"), tWeb("bi_info_vacio"), "info");
             return;
         }
 
-        // 1. Cálculo de KPIs Generales.
         const totalFacturacion = registros.reduce((acc, r) => acc + r.facturacion, 0);
         const totalOperaciones = registros.length;
         const totalUnidades = registros.reduce((acc, r) => acc + r.cantidad, 0);
@@ -1731,7 +2465,6 @@ async function cargarDatosAnalitica() {
         document.getElementById("kpi-unidades").textContent = Math.round(totalUnidades).toLocaleString("es-AR");
         document.getElementById("kpi-ticket").textContent = `$ ${formatearMoneda(ticketPromedio)}`;
 
-        // 2. Agrupaciones para Producto Estrella, Categoría Top y Gráficos.
         const cantPorProducto = {};
         const factPorProducto = {};
         const factPorMes = {};
@@ -1740,142 +2473,164 @@ async function cargarDatosAnalitica() {
         registros.forEach(r => {
             cantPorProducto[r.producto] = (cantPorProducto[r.producto] || 0) + r.cantidad;
             factPorProducto[r.producto] = (factPorProducto[r.producto] || 0) + r.facturacion;
-
             const mes = r.fecha.slice(0, 7);
             factPorMes[mes] = (factPorMes[mes] || 0) + r.facturacion;
-
             factPorCategoria[r.categoria] = (factPorCategoria[r.categoria] || 0) + r.facturacion;
         });
 
-        const productoEstrella = Object.entries(cantPorProducto).sort((a, b) => b[1] - a[1])[0][0];
-        const categoriaEstrella = Object.entries(factPorCategoria).sort((a, b) => b[1] - a[1])[0][0];
+        biEstrella = {
+            producto: Object.entries(cantPorProducto).sort((a, b) => b[1] - a[1])[0][0],
+            categoria: Object.entries(factPorCategoria).sort((a, b) => b[1] - a[1])[0][0]
+        };
+        actualizarSubtituloBI();
 
-        document.getElementById("bi-subtitulo-estrella").textContent =
-            `Más Vendido: ${productoEstrella} | Categoría Top: ${categoriaEstrella}`;
+        cacheTop10BI = Object.entries(factPorProducto).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        cacheMensualBI = Object.entries(factPorMes).sort((a, b) => a[0].localeCompare(b[0]));
+        cacheCategoriasBI = Object.entries(factPorCategoria).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
 
-        // 3. Dibujo de los 3 Gráficos en HTML5 Canvas.
-        const top10Productos = Object.entries(factPorProducto)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 10);
-        dibujarGraficoBarras("canvas-bi-barras", top10Productos);
-
-        const serieMensual = Object.entries(factPorMes).sort((a, b) => a[0].localeCompare(b[0]));
-        dibujarGraficoLineas("canvas-bi-lineas", serieMensual);
-
-        const serieCategorias = Object.entries(factPorCategoria).filter(x => x[1] > 0);
-        dibujarGraficoTorta("canvas-bi-torta", serieCategorias);
-
-        // 4. Poblado de la tabla histórica.
-        const tbody = document.querySelector("#tabla-bi tbody");
-        tbody.innerHTML = "";
-        registros.forEach(r => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td>${r.id_venta}</td>
-                <td>${r.producto}</td>
-                <td>${r.categoria}</td>
-                <td>$ ${formatearMoneda(r.precio)}</td>
-                <td>${r.cantidad}</td>
-                <td>${r.fecha}</td>
-                <td>$ ${formatearMoneda(r.facturacion)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-
+        redibujarGraficosBI();
+        renderizarTablaBI();
     } catch (error) {
-        mostrarAlerta("Error Analítico", `Fallo al procesar los datos: ${error.message}`, "error");
+        mostrarAlerta(tWeb("err_com_tit"), error.message, "error");
     }
 }
 
-function limpiarCanvas(idCanvas) {
-    const canvas = document.getElementById(idCanvas);
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+function obtenerTokensCanvas() {
+    const css = getComputedStyle(document.documentElement);
+    return {
+        bg: css.getPropertyValue("--bg-tarjeta").trim() || "#FFFFFF",
+        texto: css.getPropertyValue("--texto-primario").trim() || "#0F172A",
+        muted: css.getPropertyValue("--texto-secundario").trim() || "#64748B",
+        eje: css.getPropertyValue("--borde-suave").trim() || "#CBD5E1",
+        grilla: css.getPropertyValue("--borde-fila").trim() || "#E2E8F0",
+        barra: prefUI.tema === "dark" ? "#38BDF8" : "#2563EB",
+        linea: prefUI.tema === "dark" ? "#4ADE80" : "#16A34A"
+    };
 }
 
-function dibujarGraficoBarras(idCanvas, datos) {
-    const canvas = document.getElementById(idCanvas);
-    const ctx = canvas.getContext("2d");
-    const ancho = canvas.width;
-    const alto = canvas.height;
-    ctx.clearRect(0, 0, ancho, alto);
+function formatearEjeY(valor) {
+    if (valor >= 1_000_000) return `$${(valor / 1_000_000).toFixed(1)}M`;
+    if (valor >= 1_000) return `$${Math.round(valor / 1_000)}k`;
+    return `$${Math.round(valor)}`;
+}
 
-    if (datos.length === 0) return;
+function acortarEtiquetaBI(texto, maxLen = 11) {
+    const limpio = String(texto || "").trim();
+    if (limpio.length <= maxLen) return limpio;
+    const inicio = Math.max(2, maxLen - 6);
+    return `${limpio.slice(0, inicio)}..${limpio.slice(-4)}`;
+}
 
-    const padIzq = 55;
-    const padDer = 15;
-    const padArr = 20;
-    const padAba = 65;
-    const anchoUtil = ancho - padIzq - padDer;
+function dibujarGrillaY(ctx, padIzq, padDer, padArr, padAba, ancho, alto, maxValor, tokens) {
     const altoUtil = alto - padArr - padAba;
+    [0.0, 0.5, 1.0].forEach(frac => {
+        const y = alto - padAba - frac * altoUtil;
+        if (frac > 0) {
+            ctx.save();
+            ctx.setLineDash([3, 3]);
+            ctx.strokeStyle = tokens.grilla;
+            ctx.beginPath();
+            ctx.moveTo(padIzq, y);
+            ctx.lineTo(ancho - padDer, y);
+            ctx.stroke();
+            ctx.restore();
+        }
+        ctx.fillStyle = tokens.muted;
+        ctx.font = "10px Segoe UI, Arial";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(formatearEjeY(maxValor * frac), padIzq - 6, y);
+    });
 
-    const maxValor = Math.max(...datos.map(d => d[1]), 1);
-    const pasoX = anchoUtil / datos.length;
-    const anchoBarra = Math.max(pasoX * 0.62, 8);
-
-    // Ejes base
-    ctx.strokeStyle = "#cccccc";
+    ctx.strokeStyle = tokens.eje;
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(padIzq, padArr);
     ctx.lineTo(padIzq, alto - padAba);
     ctx.lineTo(ancho - padDer, alto - padAba);
     ctx.stroke();
+}
+
+function dibujarGraficoBarras(idCanvas, datos) {
+    const canvas = document.getElementById(idCanvas);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const tokens = obtenerTokensCanvas();
+    const ancho = canvas.width;
+    const alto = canvas.height;
+    ctx.clearRect(0, 0, ancho, alto);
+
+    if (datos.length === 0) {
+        ctx.fillStyle = tokens.muted;
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(tWeb("bi_sin_datos"), ancho / 2, alto / 2);
+        return;
+    }
+
+    const padIzq = 54, padDer = 14, padArr = 16, padAba = 66;
+    const anchoUtil = ancho - padIzq - padDer;
+    const altoUtil = alto - padArr - padAba;
+    const maxValor = Math.max(...datos.map(d => d[1]), 1);
+
+    dibujarGrillaY(ctx, padIzq, padDer, padArr, padAba, ancho, alto, maxValor, tokens);
+
+    const pasoX = anchoUtil / datos.length;
+    const anchoBarra = Math.max(pasoX * 0.60, 8);
 
     datos.forEach(([etiqueta, valor], i) => {
         const altoBarra = (valor / maxValor) * altoUtil;
         const x = padIzq + i * pasoX + (pasoX - anchoBarra) / 2;
         const y = alto - padAba - altoBarra;
 
-        ctx.fillStyle = "#2196F3";
+        ctx.fillStyle = tokens.barra;
         ctx.fillRect(x, y, anchoBarra, altoBarra);
 
         ctx.save();
         ctx.translate(x + anchoBarra / 2, alto - padAba + 8);
-        ctx.rotate(-Math.PI / 4);
-        ctx.fillStyle = "#333333";
-        ctx.font = "10px Arial";
+        ctx.rotate(-Math.PI / 4.5);
+        ctx.fillStyle = tokens.texto;
+        ctx.font = "10px Segoe UI, Arial";
         ctx.textAlign = "right";
-        ctx.fillText(etiqueta.slice(0, 12), 0, 0);
+        ctx.textBaseline = "middle";
+        ctx.fillText(acortarEtiquetaBI(etiqueta, 11), 0, 0);
         ctx.restore();
     });
 }
 
 function dibujarGraficoLineas(idCanvas, datos) {
     const canvas = document.getElementById(idCanvas);
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    const tokens = obtenerTokensCanvas();
     const ancho = canvas.width;
     const alto = canvas.height;
     ctx.clearRect(0, 0, ancho, alto);
 
-    if (datos.length === 0) return;
+    if (datos.length === 0) {
+        ctx.fillStyle = tokens.muted;
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(tWeb("bi_sin_datos"), ancho / 2, alto / 2);
+        return;
+    }
 
-    const padIzq = 55;
-    const padDer = 20;
-    const padArr = 20;
-    const padAba = 55;
+    const padIzq = 54, padDer = 18, padArr = 16, padAba = 64;
     const anchoUtil = ancho - padIzq - padDer;
     const altoUtil = alto - padArr - padAba;
-
     const maxValor = Math.max(...datos.map(d => d[1]), 1);
 
-    ctx.strokeStyle = "#cccccc";
-    ctx.beginPath();
-    ctx.moveTo(padIzq, padArr);
-    ctx.lineTo(padIzq, alto - padAba);
-    ctx.lineTo(ancho - padDer, alto - padAba);
-    ctx.stroke();
+    dibujarGrillaY(ctx, padIzq, padDer, padArr, padAba, ancho, alto, maxValor, tokens);
 
+    const n = datos.length;
     const puntos = datos.map(([mes, valor], i) => {
-        const x = datos.length === 1
-            ? padIzq + anchoUtil / 2
-            : padIzq + (i / (datos.length - 1)) * anchoUtil;
+        const x = n === 1 ? padIzq + anchoUtil / 2 : padIzq + (i / (n - 1)) * anchoUtil;
         const y = alto - padAba - (valor / maxValor) * altoUtil;
         return { x, y, mes };
     });
 
-    ctx.strokeStyle = "#4CAF50";
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = tokens.linea;
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
     puntos.forEach((p, i) => {
         if (i === 0) ctx.moveTo(p.x, p.y);
@@ -1883,78 +2638,114 @@ function dibujarGraficoLineas(idCanvas, datos) {
     });
     ctx.stroke();
 
+    const radio = n > 14 ? 2.6 : 4.0;
     puntos.forEach(p => {
-        ctx.fillStyle = "#4CAF50";
+        ctx.fillStyle = tokens.linea;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, radio, 0, Math.PI * 2);
         ctx.fill();
+    });
+
+    // Submuestreo dinámico del eje X idéntico a analitica.py para evitar superposición.
+    let indicesVisibles = [0];
+    if (n > 1) {
+        const maxEtiquetas = Math.max(2, Math.floor(anchoUtil / 54));
+        const paso = Math.max(1, Math.ceil((n - 1) / (maxEtiquetas - 1)));
+        indicesVisibles = [];
+        for (let i = 0; i < n; i += paso) indicesVisibles.push(i);
+        if (indicesVisibles[indicesVisibles.length - 1] !== n - 1) {
+            if (puntos[n - 1].x - puntos[indicesVisibles[indicesVisibles.length - 1]].x < 38) {
+                indicesVisibles[indicesVisibles.length - 1] = n - 1;
+            } else {
+                indicesVisibles.push(n - 1);
+            }
+        }
+    }
+
+    const yEje = alto - padAba;
+    indicesVisibles.forEach(idx => {
+        const p = puntos[idx];
+        ctx.strokeStyle = tokens.eje;
+        ctx.beginPath();
+        ctx.moveTo(p.x, yEje);
+        ctx.lineTo(p.x, yEje + 4);
+        ctx.stroke();
 
         ctx.save();
-        ctx.translate(p.x, alto - padAba + 10);
-        ctx.rotate(-Math.PI / 4);
-        ctx.fillStyle = "#333333";
-        ctx.font = "10px Arial";
+        ctx.translate(p.x, yEje + 10);
+        ctx.rotate(-Math.PI / 5);
+        ctx.fillStyle = tokens.texto;
+        ctx.font = "10px Segoe UI, Arial";
         ctx.textAlign = "right";
-        ctx.fillText(p.mes, 0, 0);
+        ctx.textBaseline = "middle";
+        ctx.fillText(p.mes.length >= 7 ? p.mes.slice(-5) : p.mes, 0, 0);
         ctx.restore();
     });
 }
 
 function dibujarGraficoTorta(idCanvas, datos) {
     const canvas = document.getElementById(idCanvas);
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    const tokens = obtenerTokensCanvas();
     const ancho = canvas.width;
     const alto = canvas.height;
     ctx.clearRect(0, 0, ancho, alto);
 
-    if (datos.length === 0) return;
+    if (datos.length === 0) {
+        ctx.fillStyle = tokens.muted;
+        ctx.font = "12px Segoe UI, Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(tWeb("bi_sin_datos"), ancho / 2, alto / 2);
+        return;
+    }
 
     const colores = [
-        "#2196F3", "#4CAF50", "#FF9800", "#9C27B0", "#009688",
-        "#F44336", "#607D8B", "#3F51B5", "#FFC107", "#795548"
+        "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#0D9488",
+        "#DC2626", "#475569", "#0284C7", "#CA8A04", "#9333EA"
     ];
 
-    const total = datos.reduce((acc, d) => acc + d[1], 0);
-    const cx = ancho * 0.34;
+    const total = datos.reduce((acc, d) => acc + d[1], 0) || 1;
+    const cx = ancho * 0.32;
     const cy = alto * 0.5;
-    const radio = Math.min(cx, cy) - 18;
+    const radio = Math.min(cx, cy) - 16;
 
     let anguloInicial = -Math.PI / 2;
 
-    datos.forEach(([categoria, valor], i) => {
+    datos.forEach(([, valor], i) => {
         const porcion = (valor / total) * (Math.PI * 2);
-        const color = colores[i % colores.length];
-
-        ctx.fillStyle = color;
+        ctx.fillStyle = colores[i % colores.length];
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.arc(cx, cy, radio, anguloInicial, anguloInicial + porcion);
         ctx.closePath();
         ctx.fill();
-
+        ctx.strokeStyle = tokens.bg;
+        ctx.lineWidth = 1;
+        ctx.stroke();
         anguloInicial += porcion;
     });
 
-    // Leyenda lateral con porcentajes.
-    const xLeyenda = ancho * 0.64;
+    const xLeyenda = ancho * 0.60;
     datos.slice(0, 8).forEach(([categoria, valor], i) => {
-        const y = 26 + i * 28;
+        const y = 24 + i * 26;
         const pct = ((valor / total) * 100).toFixed(1);
 
         ctx.fillStyle = colores[i % colores.length];
-        ctx.fillRect(xLeyenda, y - 9, 12, 12);
+        ctx.fillRect(xLeyenda, y - 6, 12, 12);
 
-        ctx.fillStyle = "#333333";
-        ctx.font = "11px Arial";
+        ctx.fillStyle = tokens.texto;
+        ctx.font = "11px Segoe UI, Arial";
         ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
         ctx.fillText(`${categoria.slice(0, 11)} (${pct}%)`, xLeyenda + 16, y);
     });
 }
 
 
-// =============================================
-//  13. UTILIDADES VISUALES DE TABLAS Y FORMATO
-// =============================================
+// ==============================================================================
+//  14. UTILIDADES VISUALES, ATAJOS DE TECLADO WCAG E INICIALIZACIÓN
+// ==============================================================================
 
 function marcarFilaSeleccionada(idTabla, filaActiva) {
     desmarcarFilasTabla(idTabla);
@@ -1973,3 +2764,47 @@ function formatearMoneda(numero) {
         maximumFractionDigits: 2
     });
 }
+
+// Atajos globales de accesibilidad: Esc (cerrar modal / volver al panel), Ctrl+F (buscar en tabla), Ctrl+Enter (SQL).
+document.addEventListener("keydown", evento => {
+    const modal = document.getElementById("modal-alerta");
+    const modalAbierto = modal && !modal.classList.contains("oculto");
+
+    if (evento.key === "Escape") {
+        if (modalAbierto) {
+            cerrarAlerta();
+            return;
+        }
+        const vistaActiva = document.querySelector(".vista-app.activa");
+        if (vistaActiva && vistaActiva.id !== "vista-login" && vistaActiva.id !== "vista-panel") {
+            navegarA("vista-panel");
+        }
+        return;
+    }
+
+    if ((evento.ctrlKey || evento.metaKey) && evento.key.toLowerCase() === "f") {
+        const vistaActiva = document.querySelector(".vista-app.activa");
+        if (vistaActiva) {
+            const buscador = vistaActiva.querySelector(".input-busqueda");
+            if (buscador) {
+                evento.preventDefault();
+                buscador.focus();
+                buscador.select();
+            }
+        }
+        return;
+    }
+
+    if ((evento.ctrlKey || evento.metaKey) && evento.key === "Enter") {
+        const vistaSQL = document.getElementById("vista-consola");
+        if (vistaSQL && vistaSQL.classList.contains("activa")) {
+            evento.preventDefault();
+            ejecutarConsultaSQL();
+        }
+    }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    cargarPreferenciasSesion();
+    aplicarPreferenciasUI();
+});

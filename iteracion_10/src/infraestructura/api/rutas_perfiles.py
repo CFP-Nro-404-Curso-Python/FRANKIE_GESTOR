@@ -23,17 +23,32 @@ from src.infraestructura.api.inyector_dependencias import (
 #
 #   Este módulo solo maneja el protocolo HTTP (rutas, códigos de estado 200, 201, 
 #   401, 404 y validación de entrada/salida con DTOs).
-#  
-#   No toma decisiones de negocio ni ejecuta consultas SQL: delega toda la 
-#   orquestación al 'ServicioPerfiles' inyectado por FastAPI.
 # ================================================================================
-
 
 
 router = APIRouter(
     prefix="/api/perfiles",
     tags=["Perfiles y Autenticación"]
 )
+
+
+def _serializar_perfil(p: PerfilUsuario) -> EsquemaPerfilRespuesta:
+    """Convierte la entidad PerfilUsuario en el DTO de respuesta HTTP completo."""
+    return EsquemaPerfilRespuesta(
+        id=p.id,
+        nombres=p.nombres,
+        apellidos=p.apellidos,
+        dni=p.dni,
+        rol=p.rol,
+        usuario=p.usuario,
+        telefono=p.telefono,
+        email=p.email,
+        direccion=p.direccion,
+        ciudad=p.ciudad,
+        provincia=p.provincia,
+        cp=p.cp,
+        habilitado=p.habilitado
+    )
 
 
 # --------------------------------------
@@ -52,16 +67,7 @@ def iniciar_sesion(
     """
      Recibe usuario y contraseña en texto plano, delega la verificación 
      criptográfica (Bcrypt) al caso de uso y devuelve los datos del perfil activo.
-     Si las credenciales fallan, corta el flujo con un error HTTP 401.
     """
-    
-    # -----------------------------------------------------------------------------------------
-    # CAMBIO APLICADO:
-    #  
-    #  Se modificó el llamado a 'servicio.autenticar' (que no existía en la Capa 2) 
-    #  por el método correcto 'servicio.autenticar_usuario' como define casos_uso_perfiles.py.
-    # -----------------------------------------------------------------------------------------
-
     perfil = servicio.autenticar_usuario(
         usuario=credenciales.usuario,
         password_plana=credenciales.password
@@ -73,15 +79,7 @@ def iniciar_sesion(
             detail="Credenciales inválidas o usuario inactivo."
         )
         
-    return EsquemaPerfilRespuesta(
-        id=perfil.id,
-        nombres=perfil.nombres,
-        apellidos=perfil.apellidos,
-        dni=perfil.dni,
-        rol=perfil.rol,
-        usuario=perfil.usuario,
-        habilitado=perfil.habilitado
-    )
+    return _serializar_perfil(perfil)
 
 
 # ----------------------------------------------------------------------
@@ -99,20 +97,7 @@ def crear_perfil(
 ):
     """
      Registra un nuevo actor en el sistema (Empleado, Cliente, Proveedor, etc.).
-     Extrae el 'X-Operador-Id' de la cabecera HTTP para que la capa de aplicación 
-     evalúe si el operador tiene jerarquía suficiente (RBAC) para crear este rol.
     """
-    
-    # -----------------------------------------------------------------------------------------
-    # CAMBIO APLICADO:
-    #  
-    #  El método 'registrar_perfil' de la Capa 2 NO espera recibir una entidad 'PerfilUsuario' 
-    #  armada ni parámetros separados ('nuevo_perfil' y 'password_plana').
-    #  
-    #  Espera recibir el ID del operador y un diccionario crudo ('datos: dict') 
-    #  para armar la entidad por su cuenta. Convertimos el DTO a dict usando '.model_dump()'.
-    # -----------------------------------------------------------------------------------------
-
     id_generado = servicio.registrar_perfil(
         id_operador=id_operador,
         datos=datos.model_dump()
@@ -134,30 +119,9 @@ def listar_todos_los_perfiles(
 ):
     """
      Devuelve la nómina completa de perfiles activos en el sistema sin importar su rol.
-     Esencial para poblar la grilla principal de la ventana de Usuarios.
     """
-
-    # --------------------------------------------------------------------------------
-    # CAMBIO APLICADO: LECTURA GENERAL
-    #  
-    #  Se expuso el endpoint GET raíz que consume el nuevo método 'listar_perfiles()' 
-    #  del Caso de Uso, permitiendo que el frontend recupere el catálogo completo.
-    # --------------------------------------------------------------------------------
-
     perfiles = servicio.listar_perfiles()
-    
-    return [
-        EsquemaPerfilRespuesta(
-            id=p.id,
-            nombres=p.nombres,
-            apellidos=p.apellidos,
-            dni=p.dni,
-            rol=p.rol,
-            usuario=p.usuario,
-            habilitado=p.habilitado
-        )
-        for p in perfiles
-    ]
+    return [_serializar_perfil(p) for p in perfiles]
 
 
 @router.get(
@@ -170,27 +134,11 @@ def listar_perfiles_por_rol(
     servicio: ServicioPerfiles = Depends(obtener_servicio_perfiles)
 ):
     """
-     Devuelve la nómina de perfiles activos filtrados por su rol comercial 
-     (ej. 'Cliente', 'Proveedor', 'Gerente').
+     Devuelve la nómina de perfiles activos filtrados por su rol comercial.
     """
-    
-    # CAMBIO APLICADO: Se abre el contexto 'with servicio.uow:' para que GestorSQLite 
-    # inicialice la conexión y el repositorio 'perfiles' antes de consultar.
     with servicio.uow:
         perfiles = servicio.uow.perfiles.listar_por_rol(rol)
-        
-        return [
-            EsquemaPerfilRespuesta(
-                id=p.id,
-                nombres=p.nombres,
-                apellidos=p.apellidos,
-                dni=p.dni,
-                rol=p.rol,
-                usuario=p.usuario,
-                habilitado=p.habilitado
-            )
-            for p in perfiles
-        ]
+        return [_serializar_perfil(p) for p in perfiles]
 
 
 @router.get(
@@ -204,11 +152,7 @@ def obtener_perfil_por_id(
 ):
     """
      Busca y retorna un perfil específico por su clave primaria (ID).
-     Si no existe o fue dado de baja lógica, retorna HTTP 404.
     """
-
-    # CAMBIO APLICADO: Se abre el contexto 'with servicio.uow:' para instanciar 
-    # el repositorio antes de buscar por ID.
     with servicio.uow:
         perfil = servicio.uow.perfiles.obtener_por_id(id_perfil)
         
@@ -218,15 +162,7 @@ def obtener_perfil_por_id(
                 detail=f"No se encontró un perfil activo con ID {id_perfil}."
             )
             
-        return EsquemaPerfilRespuesta(
-            id=perfil.id,
-            nombres=perfil.nombres,
-            apellidos=perfil.apellidos,
-            dni=perfil.dni,
-            rol=perfil.rol,
-            usuario=perfil.usuario,
-            habilitado=perfil.habilitado
-        )
+        return _serializar_perfil(perfil)
 
 
 @router.put(
@@ -240,21 +176,8 @@ def modificar_perfil(
     servicio: ServicioPerfiles = Depends(obtener_servicio_perfiles)
 ):
     """
-     Actualiza los datos maestros o credenciales de un perfil existente.
-     Valida previamente mediante RBAC si el operador tiene rango para editar al objetivo.
+     Actualiza los datos maestros, de contacto/ubicación o credenciales de un perfil existente.
     """
-
-
-    # --------------------------------------------------------------------------------------------
-    # CAMBIO APLICADO:
-    #  
-    #  El método 'modificar_perfil' de la Capa 2 NO espera recibir una entidad 'PerfilUsuario' 
-    #  pre-armada ni un parámetro 'perfil_modificado'.
-    #  
-    #  Espera recibir (id_operador, id_destino, datos: dict) para buscar la entidad, validar RBAC
-    #  y aplicar las modificaciones internamente. Convertimos el DTO a dict excluyendo los nulos.
-    # --------------------------------------------------------------------------------------------
-
     servicio.modificar_perfil(
         id_operador=id_operador,
         id_destino=id_perfil,
@@ -275,17 +198,7 @@ def eliminar_perfil(
 ):
     """
      Ejecuta la baja lógica (Soft Delete: habilitado = 0) de un perfil.
-     Pasa por el filtro RBAC para impedir que un usuario de menor rango 
-     elimine a un superior o que un operador se dé de baja a sí mismo.
     """
-    
-    # --------------------------------------------------------------------------
-    # CAMBIO APLICADO:
-    #  
-    #  Se modificó el llamado para usar el método correcto 'dar_de_baja_perfil'
-    #  en lugar de 'eliminar_perfil', tal como define casos_uso_perfiles.py.
-    # --------------------------------------------------------------------------
-    
     servicio.dar_de_baja_perfil(
         id_operador=id_operador,
         id_destino=id_perfil

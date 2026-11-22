@@ -3,6 +3,8 @@ from src.dominio.excepciones import ErrorCredencialesInvalidas, ErrorEntidadNoEn
 from src.dominio.politicas_rbac import obtener_estrategia_rbac
 from src.dominio.puertos import PuertoUnidadDeTrabajo, PuertoHashing
 
+
+
 # ================================================================================
 #  CASOS DE USO: GESTIÓN DE PERFILES Y AUTENTICACIÓN (CAPA 2 - APLICACIÓN)
 # ================================================================================
@@ -12,8 +14,6 @@ from src.dominio.puertos import PuertoUnidadDeTrabajo, PuertoHashing
 #   coordinar: busca la política de seguridad (RBAC), encripta la clave usando el 
 #   puerto de hashing, y le dice a la Unidad de Trabajo que guarde los cambios.
 # ================================================================================
-
-
 
 class ServicioPerfiles:
     """
@@ -49,8 +49,8 @@ class ServicioPerfiles:
 
     def registrar_perfil(self, id_operador: int, datos: dict) -> int:
         """
-         Caso de Uso: Alta de un nuevo actor (Usuario, Cliente, Proveedor, etc.).
-         Aplica RBAC antes de hacer cualquier mutación.
+         Caso de Uso: Alta de un nuevo actor (Usuario, Empleado, Cliente, Proveedor).
+         Aplica RBAC antes de hacer cualquier mutación e incluye su legajo 3FN.
         """
         with self.uow:
             # 1. Identificar quién hace la operación y qué permisos tiene.
@@ -66,24 +66,30 @@ class ServicioPerfiles:
             if datos.get("password_plana"):
                 password_hash = self.hasher.hashear_password(datos["password_plana"])
                 
-            # 4. Construir la entidad pura
+            # 4. Construir la entidad pura incluyendo datos de contacto y ubicación.
             nuevo_perfil = PerfilUsuario(
                 nombres=datos["nombres"],
                 apellidos=datos["apellidos"],
-                dni=datos["dni"],
+                dni=datos.get("dni") or "S/D",
                 rol=rol_destino,
                 usuario=datos.get("usuario"),
-                password_hash=password_hash
+                password_hash=password_hash,
+                telefono=datos.get("telefono") or "S/D",
+                email=datos.get("email") or "S/D",
+                direccion=datos.get("direccion") or "S/D",
+                ciudad=datos.get("ciudad") or "S/D",
+                provincia=datos.get("provincia") or "S/D",
+                cp=datos.get("cp") or "S/D"
             )
             
             # 5. Persistir usando la Unidad de Trabajo (ACID).
-            # Si algo falla, el 'with self.uow' hace rollback automático.
             return self.uow.perfiles.guardar(nuevo_perfil)
 
     def modificar_perfil(self, id_operador: int, id_destino: int, datos: dict) -> None:
         """
          Caso de Uso: Modificación de actor. 
-         Revisa permisos, actualiza campos y, opcionalmente, re-hashea la clave.
+         Revisa permisos, actualiza campos maestros/contacto y, opcionalmente, re-hashea la clave.
+         Permite actualizaciones parciales (desde Usuarios o desde RRHH) sin pisar datos ajenos.
         """
         with self.uow:
             rol_operador = self.uow.perfiles.obtener_rol_por_id(id_operador)
@@ -100,12 +106,18 @@ class ServicioPerfiles:
             if datos.get("rol") and datos.get("rol") != perfil_destino.rol:
                 estrategia_rbac.validar_creacion(datos["rol"])
 
-            # Actualizamos el objeto en memoria.
+            # Actualizamos el objeto en memoria conservando los valores previos si no se enviaron.
             perfil_destino.nombres = datos.get("nombres", perfil_destino.nombres)
             perfil_destino.apellidos = datos.get("apellidos", perfil_destino.apellidos)
             perfil_destino.dni = datos.get("dni", perfil_destino.dni)
             perfil_destino.rol = datos.get("rol", perfil_destino.rol)
             perfil_destino.usuario = datos.get("usuario", perfil_destino.usuario)
+            perfil_destino.telefono = datos.get("telefono", perfil_destino.telefono)
+            perfil_destino.email = datos.get("email", perfil_destino.email)
+            perfil_destino.direccion = datos.get("direccion", perfil_destino.direccion)
+            perfil_destino.ciudad = datos.get("ciudad", perfil_destino.ciudad)
+            perfil_destino.provincia = datos.get("provincia", perfil_destino.provincia)
+            perfil_destino.cp = datos.get("cp", perfil_destino.cp)
             
             # Si mandaron clave nueva, calculamos el nuevo hash.
             if datos.get("password_plana"):
@@ -132,16 +144,10 @@ class ServicioPerfiles:
             # Ejecutar borrado lógico.
             self.uow.perfiles.eliminar(id_destino)
 
-
-    # ---------------------------------
-    #  MÉTODO AÑADIDO: LECTURA GENERAL
-    # ---------------------------------
-    
     def listar_perfiles(self) -> list[PerfilUsuario]:
         """
          Caso de Uso: Obtener el catálogo completo de perfiles activos en el sistema
          sin filtrar por rol. Necesario para poblar las grillas principales.
         """
         with self.uow:
-            # Asumimos que tu repositorio tiene un método listar_todos o equivalente.
             return self.uow.perfiles.listar_todos()

@@ -6,21 +6,22 @@ from tkinter import ttk, messagebox
 import pytest
 import requests
 import bcrypt
+import customtkinter as ctk
 from fastapi.testclient import TestClient
 
 
-
-# ==============================================================================
-#  SUITE DE INTEGRACIÓN: CLIENTE WEB SPA Y SINCRONIZACIÓN CON ESCRITORIO
-# ==============================================================================
+# ================================================================================
+#  SUITE DE INTEGRACIÓN: CLIENTE WEB SPA Y SINCRONIZACIÓN 3FN CON ESCRITORIO
+# ================================================================================
 #  UBICACIÓN: tests/integracion/test_sincronizacion_web_escritorio.py
 #
 #  DECISIÓN DE DISEÑO:
-#   Verifica que la interfaz Web (HTML5/CSS3/JS) cumpla con los requisitos de
-#   diseño responsive móvil, conectividad LAN dinámica, cabeceras CORS y que
-#   cualquier operación realizada desde la Web se refleje inmediatamente en las
-#   ventanas de Tkinter (y viceversa) al compartir el mismo Backend FastAPI.
-# ==============================================================================
+#
+#   Verifica la integridad responsive de la SPA Web (paleta Slate/Blue unificada,
+#   Modo Oscuro, Alto Contraste WCAG, i18n ES/EN, cero localStorage, CORS LAN) y
+#   garantiza la sincronización bidireccional real en SQLite 3FN de legajos
+#   personales y ubicaciones de stock entre el navegador (PC/Móvil) y CustomTkinter.
+# ================================================================================
 
 DIRECTORIO_ACTUAL = os.path.dirname(os.path.abspath(__file__))
 DIRECTORIO_TESTS = os.path.dirname(DIRECTORIO_ACTUAL)
@@ -36,21 +37,23 @@ for ruta in (DIRECTORIO_RAIZ, DIRECTORIO_ESCRITORIO, DIRECTORIO_VISTAS):
 from src.infraestructura.api.servidor import app
 from src.infraestructura.api.inyector_dependencias import obtener_uow
 from src.infraestructura.persistencia.gestor_sqlite import GestorSQLite
-from src.presentacion.escritorio.cliente_api import cliente_http
+from src.presentacion.escritorio.cliente_api import cliente_http, gestor_ui
 
 import src.presentacion.escritorio.vistas.clientes as mod_clientes
+import src.presentacion.escritorio.vistas.empleados as mod_empleados
 import src.presentacion.escritorio.vistas.proveedores as mod_proveedores
 import src.presentacion.escritorio.vistas.stock as mod_stock
 import src.presentacion.escritorio.vistas.facturacion as mod_facturacion
 import src.presentacion.escritorio.vistas.usuarios as mod_usuarios
 
 
-# --------------------------------------------------
-#  PUENTE DE RED EN MEMORIA Y HELPERS DE INSPECCIÓN
-# --------------------------------------------------
+# ----------------------------------------------------------------
+#  PUENTE DE RED EN MEMORIA Y HELPERS DE INSPECCIÓN CUSTOMTKINTER
+# ----------------------------------------------------------------
 
 class _PuenteRequestsTestClient:
-    """Conecta las peticiones de cliente_api.py (Tkinter) al TestClient de FastAPI."""
+    """Conecta las peticiones de cliente_api.py (CustomTkinter) al TestClient de FastAPI."""
+
     def __init__(self, client: TestClient):
         self.client = client
 
@@ -85,24 +88,34 @@ def _buscar_treeview(contenedor) -> ttk.Treeview:
     return tablas[0]
 
 
-def _buscar_boton_por_texto(contenedor, texto_parcial: str) -> tk.Button:
-    for boton in _buscar_widgets(contenedor, tk.Button):
+def _buscar_boton_por_texto(contenedor, texto_parcial: str) -> ctk.CTkButton:
+    for boton in _buscar_widgets(contenedor, ctk.CTkButton):
         if texto_parcial.lower() in str(boton.cget("text")).lower():
             return boton
-    raise AssertionError(f"No se encontró el botón '{texto_parcial}'.")
+    raise AssertionError(f"No se encontró el botón CTkButton '{texto_parcial}'.")
 
 
-# ---------------------------------------------------------------------
-#  FIXTURE DE ENTORNO COMPARTIDO (WEB + ESCRITORIO + FASTAPI + SQLITE)
-# ---------------------------------------------------------------------
+def _clicar_boton(boton: ctk.CTkButton):
+    comando = boton.cget("command")
+    if not callable(comando):
+        comando = getattr(boton, "_command", None)
+    assert callable(comando), f"El botón '{boton.cget('text')}' no tiene comando ejecutable."
+    comando()
+
+
+def _escribir_entry(entry: ctk.CTkEntry, texto: str):
+    entry.delete(0, "end")
+    entry.insert(0, str(texto))
+
+
+# ----------------------------------------------------------------------------
+#  FIXTURE DE ENTORNO COMPARTIDO (WEB + CUSTOMTKINTER + FASTAPI + SQLITE 3FN)
+# ----------------------------------------------------------------------------
 
 @pytest.fixture
 def entorno_multicliente(tmp_path, monkeypatch):
-    """
-     Levanta una base SQLite temporal compartida por:
-     - El cliente Web (simulado con peticiones HTTP directas + cabeceras CORS de LAN).
-     - El cliente Escritorio (ventanas reales de Tkinter usando cliente_http).
-    """
+    gestor_ui.resetear_por_defecto()
+
     ruta_db_test = str(tmp_path / "test_frankie_sync.db")
     ruta_esquema = os.path.join(DIRECTORIO_RAIZ, "db", "esquema.sql")
 
@@ -127,7 +140,10 @@ def entorno_multicliente(tmp_path, monkeypatch):
 
     cursor.execute("SELECT id FROM roles WHERE rol = 'Administrador'")
     id_rol_admin = cursor.fetchone()[0]
-    cursor.execute("INSERT INTO usuxroles (id_usuario, id_rol, habilitado) VALUES (?, ?, 1)", (id_admin, id_rol_admin))
+    cursor.execute(
+        "INSERT INTO usuxroles (id_usuario, id_rol, habilitado) VALUES (?, ?, 1)",
+        (id_admin, id_rol_admin)
+    )
     conexion.commit()
     conexion.close()
 
@@ -140,13 +156,14 @@ def entorno_multicliente(tmp_path, monkeypatch):
     monkeypatch.setattr(requests, "put", puente.put)
     monkeypatch.setattr(requests, "delete", puente.delete)
 
-    cliente_http.id_operador = 1
+    cliente_http.id_operador = id_admin
 
     monkeypatch.setattr(messagebox, "showinfo", lambda t, m: None)
     monkeypatch.setattr(messagebox, "showwarning", lambda t, m: None)
     monkeypatch.setattr(messagebox, "showerror", lambda t, m: None)
 
-    root = tk.Tk()
+    ctk.set_appearance_mode("light")
+    root = ctk.CTk()
     root.withdraw()
 
     yield {
@@ -155,6 +172,7 @@ def entorno_multicliente(tmp_path, monkeypatch):
         "ruta_db": ruta_db_test
     }
 
+    gestor_ui.resetear_por_defecto()
     app.dependency_overrides.clear()
     try:
         root.destroy()
@@ -162,30 +180,28 @@ def entorno_multicliente(tmp_path, monkeypatch):
         pass
 
 
+# ======================================================================
+#  CASOS DE PRUEBA: AUDITORÍA WEB SPA, CERO CACHÉS Y SINCRONIZACIÓN 3FN
+# ======================================================================
 
-# =============================================================================
-#  CASOS DE PRUEBA: AUDITORÍA WEB SPA, CORS LAN Y SINCRONIZACIÓN BIDIRECCIONAL
-# =============================================================================
-
-def test_1_integridad_archivos_web_spa_y_reglas_responsive_movil():
+def test_1_integridad_web_spa_paleta_unificada_y_cero_localstorage():
     """
-     Verifica que index.html, estilos.css y app_web.js existan y contengan:
-     - Las 10 vistas equivalentes al escritorio.
-     - Meta viewport móvil y Media Queries (@media) para pantallas de celulares.
-     - Resolución dinámica de IP en red local (window.location.hostname).
+     Verifica que index.html, estilos.css y app_web.js cumplan:
+     - 10 vistas equivalentes y meta viewport móvil.
+     - Paleta Slate/Blue unificada con CustomTkinter y Media Queries móviles.
+     - Resolución LAN dinámica (window.location.hostname) y CERO uso de localStorage.
     """
     ruta_html = os.path.join(DIRECTORIO_WEB, "index.html")
     ruta_css = os.path.join(DIRECTORIO_WEB, "estilos.css")
     ruta_js = os.path.join(DIRECTORIO_WEB, "app_web.js")
 
-    assert os.path.exists(ruta_html), "Falta el archivo index.html en src/presentacion/web/"
-    assert os.path.exists(ruta_css), "Falta el archivo estilos.css en src/presentacion/web/"
-    assert os.path.exists(ruta_js), "Falta el archivo app_web.js en src/presentacion/web/"
+    assert os.path.exists(ruta_html)
+    assert os.path.exists(ruta_css)
+    assert os.path.exists(ruta_js)
 
     with open(ruta_html, "r", encoding="utf-8") as f:
         contenido_html = f.read()
 
-    # Verificamos etiqueta viewport para celulares y las 10 secciones de la SPA.
     assert 'name="viewport"' in contenido_html
     assert "width=device-width" in contenido_html
 
@@ -200,34 +216,32 @@ def test_1_integridad_archivos_web_spa_y_reglas_responsive_movil():
     with open(ruta_css, "r", encoding="utf-8") as f:
         contenido_css = f.read()
 
-    # Verificamos reglas responsive para móviles y paleta de colores corporativa.
     assert "@media (max-width: 640px)" in contenido_css
-    assert "#2196F3" in contenido_css
-    assert "#4CAF50" in contenido_css
+    assert "#2563EB" in contenido_css
+    assert "#16A34A" in contenido_css
+    assert "#1E293B" in contenido_css
 
     with open(ruta_js, "r", encoding="utf-8") as f:
         contenido_js = f.read()
 
-    # Verificamos que el JS tome dinámicamente la IP del host LAN y envíe X-Operador-Id.
     assert "window.location.hostname" in contenido_js
     assert "X-Operador-Id" in contenido_js
+    assert "localStorage." not in contenido_js, "app_web.js no debe invocar localStorage para datos de negocio."
 
 
 def test_2_cors_habilitado_para_clientes_moviles_en_red_local(entorno_multicliente):
     """
-     Simula una petición HTTP enviada desde el navegador de un teléfono móvil en la
-     red WiFi local (Origin: http://192.168.1.45:8080) y verifica que FastAPI
-     permita el tráfico Cross-Origin (CORS) incluyendo la cabecera X-Operador-Id.
+     Simula una petición Preflight OPTIONS enviada desde un móvil en red WiFi local
+     y verifica que FastAPI permita el tráfico Cross-Origin incluyendo X-Operador-Id.
     """
     web_client = entorno_multicliente["web_client"]
-    origen_movil_lan = "http://192.168.1.45:8080"
+    origen_movil_lan = "http://192.168.1.38:8080"
 
-    # Petición Preflight OPTIONS que envía cualquier navegador móvil antes de un POST/PUT/DELETE.
     respuesta_options = web_client.options(
         "/api/perfiles",
         headers={
             "Origin": origen_movil_lan,
-            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Method": "PUT",
             "Access-Control-Request-Headers": "Content-Type, X-Operador-Id"
         }
     )
@@ -235,36 +249,47 @@ def test_2_cors_habilitado_para_clientes_moviles_en_red_local(entorno_multiclien
     assert respuesta_options.headers.get("access-control-allow-origin") in ("*", origen_movil_lan)
 
 
-def test_3_sincronizacion_alta_en_web_se_refleja_en_escritorio_tkinter(entorno_multicliente):
+def test_3_sincronizacion_alta_3fn_en_web_se_refleja_en_customtkinter(entorno_multicliente):
     """
-     Verifica que si un operador carga un Proveedor, un Cliente y un Producto desde
-     la Vista Web (Móvil/PC), al abrir las ventanas de Tkinter en la PC los datos
-     aparezcan inmediatamente en sus tablas Treeview.
+     Verifica que los datos completos (contacto, domicilio y ubicación de stock)
+     cargados desde la Web aparezcan íntegramente en las grillas de CustomTkinter.
     """
     root = entorno_multicliente["root"]
     web = entorno_multicliente["web_client"]
     cabeceras_web = {"X-Operador-Id": "1"}
 
-    # 1. El usuario desde el navegador Web da de alta un Proveedor.
+    # 1. Alta de Proveedor con legajo 3FN desde la Web.
     res_prov = web.post("/api/perfiles", headers=cabeceras_web, json={
         "nombres": "Distribuidora Atlántica Web",
         "apellidos": "Lucía Méndez",
         "dni": "30-99887766-1",
-        "rol": "Proveedor"
+        "rol": "Proveedor",
+        "telefono": "223-490-1000",
+        "email": "contacto@atlantica.com",
+        "direccion": "Av. Luro 4100",
+        "ciudad": "Mar del Plata",
+        "provincia": "Buenos Aires",
+        "cp": "7600"
     })
     assert res_prov.status_code == 201
     id_prov_web = res_prov.json()["id"]
 
-    # 2. Desde el navegador Web da de alta un Cliente.
+    # 2. Alta de Cliente con legajo 3FN desde la Web.
     res_cli = web.post("/api/perfiles", headers=cabeceras_web, json={
         "nombres": "Sofía",
         "apellidos": "Alonso",
         "dni": "40111222",
-        "rol": "Cliente"
+        "rol": "Cliente",
+        "telefono": "223-600-7788",
+        "email": "sofia@mail.com",
+        "direccion": "Güemes 2900",
+        "ciudad": "Mar del Plata",
+        "provincia": "Buenos Aires",
+        "cp": "7600"
     })
     assert res_cli.status_code == 201
 
-    # 3. Desde el navegador Web registra un Producto asociado a ese Proveedor.
+    # 3. Alta de Producto con ubicación en depósito desde la Web.
     res_prod = web.post("/api/productos", headers=cabeceras_web, json={
         "codigo": "WEB-TEC-01",
         "descripcion": "Teclado Mecánico Inalámbrico",
@@ -274,41 +299,133 @@ def test_3_sincronizacion_alta_en_web_se_refleja_en_escritorio_tkinter(entorno_m
         "precio_venta": 55000.0,
         "stock_actual": 25.0,
         "stock_minimo": 5.0,
+        "ubicacion": "Estantería B-12",
         "vencimiento": "S/D"
     })
     assert res_prod.status_code == 201
 
-    # 4. Abrimos las ventanas de Escritorio (Tkinter) y verificamos que muestren los registros creados en la Web.
+    # 4. Abrimos las vistas de CustomTkinter y verificamos TODOS los campos 3FN.
     win_proveedores = mod_proveedores.Proveedor(root)
     tabla_prov = _buscar_treeview(win_proveedores)
-    razones_sociales_tk = [tabla_prov.item(i, "values")[0] for i in tabla_prov.get_children()]
-    assert "Distribuidora Atlántica Web" in razones_sociales_tk
+    vals_prov = tabla_prov.item(str(id_prov_web), "values")
+    assert vals_prov[0] == "Distribuidora Atlántica Web"
+    assert vals_prov[2] == "223-490-1000"
+    assert vals_prov[3] == "contacto@atlantica.com"
+    assert vals_prov[4] == "Av. Luro 4100"
 
     win_clientes = mod_clientes.Cliente(root)
     tabla_cli = _buscar_treeview(win_clientes)
-    apellidos_cli_tk = [tabla_cli.item(i, "values")[1] for i in tabla_cli.get_children()]
-    assert "Alonso" in apellidos_cli_tk
+    vals_cli = tabla_cli.item(tabla_cli.get_children()[0], "values")
+    assert vals_cli[1] == "Alonso"
+    assert vals_cli[3] == "223-600-7788"
+    assert vals_cli[5] == "Güemes 2900"
 
     win_stock = mod_stock.Stock(root)
     tabla_stk = _buscar_treeview(win_stock)
-    codigos_stk_tk = [tabla_stk.item(i, "values")[0] for i in tabla_stk.get_children()]
-    assert "WEB-TEC-01" in codigos_stk_tk
+    vals_stk = tabla_stk.item(tabla_stk.get_children()[0], "values")
+    assert vals_stk[0] == "WEB-TEC-01"
+    assert vals_stk[8] == "Estantería B-12"
 
     win_proveedores.destroy()
     win_clientes.destroy()
     win_stock.destroy()
 
 
-def test_4_sincronizacion_venta_en_escritorio_actualiza_stock_y_bi_en_web(entorno_multicliente):
+def test_4_flujo_gerente_web_edita_vendedor_3fn_y_se_refleja_en_tk_rrhh(entorno_multicliente):
     """
-     Verifica el camino inverso: se emite una factura desde la ventana de Facturación
-     de Tkinter en la PC, y cuando el teléfono móvil consulta la API para renderizar
-     Stock y el Tablero BI, recibe el stock descontado y la nueva factura al instante.
+     Reproduce el escenario crítico real:
+     1. Admin crea un Gerente en Escritorio (CustomTkinter).
+     2. El Gerente se loguea en la Web, crea un Vendedor y luego completa todos
+        sus datos personales (DNI, teléfono, email, dirección, ciudad, provincia, CP).
+     3. Al abrir RRHH en CustomTkinter se reflejan TODOS los campos actualizados,
+        y el vendedor conserva intactas sus credenciales de acceso.
     """
     root = entorno_multicliente["root"]
     web = entorno_multicliente["web_client"]
 
-    # 1. Preparamos catálogo base.
+    # 1. Admin crea al Gerente desde CustomTkinter (Usuarios).
+    win_usu = mod_usuarios.Usuario(root, id_actual=1, rol_actual="Administrador")
+    cajas_usu = _buscar_widgets(win_usu, ctk.CTkEntry)
+    combo_rol = _buscar_widgets(win_usu, ctk.CTkComboBox)[0]
+
+    _escribir_entry(cajas_usu[0], "Roberto")
+    _escribir_entry(cajas_usu[1], "Gerente")
+    _escribir_entry(cajas_usu[2], "rgerente")
+    _escribir_entry(cajas_usu[3], "GerentePass123")
+    combo_rol.set("Gerente")
+    _clicar_boton(_buscar_boton_por_texto(win_usu, "Guardar"))
+    win_usu.destroy()
+
+    # 2. El Gerente inicia sesión desde el cliente Web.
+    res_login_ger = web.post("/api/perfiles/login", json={
+        "usuario": "rgerente",
+        "password": "GerentePass123"
+    })
+    assert res_login_ger.status_code == 200
+    id_gerente = res_login_ger.json()["id"]
+    cabeceras_gerente = {"X-Operador-Id": str(id_gerente)}
+
+    # 3. El Gerente crea un Vendedor en la Web (módulo Usuarios).
+    res_vend = web.post("/api/perfiles", headers=cabeceras_gerente, json={
+        "nombres": "Julián",
+        "apellidos": "Álvarez",
+        "dni": "00000000",
+        "rol": "Empleado - Ventas",
+        "usuario": "jalvarez",
+        "password_plana": "Ventas2026"
+    })
+    assert res_vend.status_code == 201
+    id_vendedor = res_vend.json()["id"]
+
+    # 4. El Gerente completa los datos personales del Vendedor en la Web (módulo RRHH).
+    res_edit = web.put(f"/api/perfiles/{id_vendedor}", headers=cabeceras_gerente, json={
+        "nombres": "Julián",
+        "apellidos": "Álvarez",
+        "dni": "42555666",
+        "rol": "Empleado - Ventas",
+        "telefono": "223-512-3456",
+        "email": "julian.alvarez@frankie.com",
+        "direccion": "Av. Constitución 5100",
+        "ciudad": "Mar del Plata",
+        "provincia": "Buenos Aires",
+        "cp": "7600"
+    })
+    assert res_edit.status_code == 200
+
+    # 5. En CustomTkinter (RRHH) deben aparecer TODOS los datos personales, no solo el DNI.
+    win_rrhh = mod_empleados.Empleado(root, id_actual=1, rol_actual="Administrador")
+    tabla_rrhh = _buscar_treeview(win_rrhh)
+    valores_tk = tabla_rrhh.item(str(id_vendedor), "values")
+
+    assert valores_tk[0] == "Julián"
+    assert valores_tk[1] == "Álvarez"
+    assert valores_tk[2] == "42555666"
+    assert valores_tk[3] == "223-512-3456"
+    assert valores_tk[4] == "julian.alvarez@frankie.com"
+    assert valores_tk[5] == "Av. Constitución 5100"
+    assert valores_tk[6] == "Mar del Plata"
+    assert valores_tk[7] == "Buenos Aires"
+    assert valores_tk[8] == "7600"
+    assert valores_tk[9] == "Empleado - Ventas"
+    win_rrhh.destroy()
+
+    # 6. El Vendedor sigue pudiendo loguearse porque RRHH no pisó sus credenciales.
+    res_login_vend = web.post("/api/perfiles/login", json={
+        "usuario": "jalvarez",
+        "password": "Ventas2026"
+    })
+    assert res_login_vend.status_code == 200
+    assert res_login_vend.json()["direccion"] == "Av. Constitución 5100"
+
+
+def test_5_sincronizacion_venta_en_escritorio_actualiza_stock_y_bi_en_web(entorno_multicliente):
+    """
+     Verifica el camino inverso: una venta emitida desde CustomTkinter actualiza
+     inmediatamente el stock y el historial BI consumido por la interfaz Web.
+    """
+    root = entorno_multicliente["root"]
+    web = entorno_multicliente["web_client"]
+
     id_prov = cliente_http.crear_perfil({"nombres": "Prov Sync", "apellidos": "SA", "dni": "1", "rol": "Proveedor"})["id"]
     id_vend = cliente_http.crear_perfil({"nombres": "Vendedor", "apellidos": "PC", "dni": "2", "rol": "Empleado - Ventas"})["id"]
     id_cli = cliente_http.crear_perfil({"nombres": "Cliente", "apellidos": "Móvil", "dni": "3", "rol": "Cliente"})["id"]
@@ -320,44 +437,43 @@ def test_4_sincronizacion_venta_en_escritorio_actualiza_stock_y_bi_en_web(entorn
         "precio_costo": 15000.0,
         "precio_venta": 25000.0,
         "stock_actual": 10.0,
-        "stock_minimo": 2.0
+        "stock_minimo": 2.0,
+        "ubicacion": "Mostrador 1"
     })["id"]
 
-    # 2. Emitimos una venta de 4 unidades desde la ventana Tkinter de Facturación.
     win_fac = mod_facturacion.Facturacion(root)
-    combos = _buscar_widgets(win_fac, ttk.Combobox)
-    cajas = [w for w in _buscar_widgets(win_fac, tk.Entry) if not isinstance(w, ttk.Combobox)]
+    combos = _buscar_widgets(win_fac, ctk.CTkComboBox)
+    cajas = _buscar_widgets(win_fac, ctk.CTkEntry)
 
     combos[0].set(f"Vendedor PC (ID: {id_vend})")
     combos[1].set(f"Cliente Móvil (ID: {id_cli})")
     combos[2].set("SYNC-MOUSE-99 - Mouse Gamer Óptico")
-    combos[2].event_generate("<<ComboboxSelected>>")
+    win_fac.autocompletar_precio("SYNC-MOUSE-99 - Mouse Gamer Óptico")
 
-    cajas[0].insert(0, "4")  # Cantidad vendida: 4.
-    cajas[2].insert(0, "0")  # Sin descuento.
+    _escribir_entry(cajas[0], "4")
+    _escribir_entry(cajas[2], "0")
 
-    _buscar_boton_por_texto(win_fac, "Guardar Facturación").invoke()
+    _clicar_boton(_buscar_boton_por_texto(win_fac, "Guardar Facturación"))
     win_fac.destroy()
 
-    # 3. El cliente Web en el celular consulta GET /api/productos y GET /api/facturas.
     productos_web = web.get("/api/productos").json()
     prod_sincronizado = next(p for p in productos_web if p["id"] == id_prod)
-    assert prod_sincronizado["stock_actual"] == 6.0, "El stock en la vista Web no reflejó el descuento hecho en Tkinter."
+    assert prod_sincronizado["stock_actual"] == 6.0
+    assert prod_sincronizado["ubicacion"] == "Mostrador 1"
 
     facturas_web = web.get("/api/facturas").json()
     assert len(facturas_web) == 1
     assert float(facturas_web[0]["total"]) == 100000.0
 
 
-def test_5_sincronizacion_credenciales_entre_web_y_escritorio(entorno_multicliente):
+def test_6_sincronizacion_credenciales_entre_web_y_customtkinter(entorno_multicliente):
     """
-     Verifica que si un Administrador crea un nuevo usuario desde la interfaz Web,
-     ese usuario pueda iniciar sesión inmediatamente desde el cliente de Escritorio.
+     Verifica que un usuario creado desde la Web pueda iniciar sesión en el
+     cliente de Escritorio y figure inmediatamente en la grilla de Usuarios.
     """
     root = entorno_multicliente["root"]
     web = entorno_multicliente["web_client"]
 
-    # 1. Alta de un Gerente desde el cliente Web.
     res_alta = web.post(
         "/api/perfiles",
         headers={"X-Operador-Id": "1"},
@@ -372,14 +488,74 @@ def test_5_sincronizacion_credenciales_entre_web_y_escritorio(entorno_multiclien
     )
     assert res_alta.status_code == 201
 
-    # 2. El nuevo usuario inicia sesión desde el cliente de Escritorio (cliente_http).
     sesion_escritorio = cliente_http.iniciar_sesion("vlynch", "ClaveSeguraWeb123")
     assert sesion_escritorio["rol"] == "Gerente"
     assert sesion_escritorio["nombres"] == "Valeria"
 
-    # 3. Además aparece listado en la grilla de Gestión de Usuarios de Tkinter.
     win_usu = mod_usuarios.Usuario(root, id_actual=1, rol_actual="Administrador")
     tabla_usu = _buscar_treeview(win_usu)
     usuarios_en_grilla = [tabla_usu.item(i, "values")[0] for i in tabla_usu.get_children()]
     assert "vlynch" in usuarios_en_grilla
     win_usu.destroy()
+
+
+def test_7_paridad_web_spa_temas_bilingue_wcag_buscadores_y_bi():
+    """
+     Verifica la paridad 1:1 de la interfaz Web SPA respecto a CustomTkinter:
+     - Barra de preferencias (ES/EN, Claro/Oscuro, A-/A+, Alto Contraste).
+     - Atributos semánticos WCAG 2.1 AA (aria-live, aria-pressed, :focus-visible).
+     - Buscadores instantáneos en las 7 grillas y semáforo de stock.
+     - Gráficos BI con anti-superposición y persistencia de preferencias solo en sessionStorage.
+    """
+    ruta_html = os.path.join(DIRECTORIO_WEB, "index.html")
+    ruta_css = os.path.join(DIRECTORIO_WEB, "estilos.css")
+    ruta_js = os.path.join(DIRECTORIO_WEB, "app_web.js")
+
+    with open(ruta_html, "r", encoding="utf-8") as f:
+        html = f.read()
+    with open(ruta_css, "r", encoding="utf-8") as f:
+        css = f.read()
+    with open(ruta_js, "r", encoding="utf-8") as f:
+        js = f.read()
+
+    # Controles de preferencias y accesibilidad WCAG en HTML.
+    for id_ctrl in (
+        "btn-pref-idioma", "btn-pref-tema",
+        "btn-pref-zoom-menos", "btn-pref-zoom-mas", "btn-pref-hc"
+    ):
+        assert f'id="{id_ctrl}"' in html
+
+    assert 'role="toolbar"' in html
+    assert 'aria-live="polite"' in html
+    assert 'aria-pressed=' in html
+    assert 'data-i18n=' in html
+
+    # Buscadores instantáneos presentes en las 7 grillas.
+    for id_busq in (
+        "buscar-usuarios", "buscar-empleados", "buscar-clientes",
+        "buscar-proveedores", "buscar-stock", "buscar-facturacion", "buscar-bi"
+    ):
+        assert f'id="{id_busq}"' in html
+
+    # Perfiles visuales, escalado WCAG y semáforo en CSS.
+    assert 'html[data-theme="dark"]' in css
+    assert 'html[data-contrast="high"]' in css
+    assert 'html[data-theme="dark"][data-contrast="high"]' in css
+    assert 'html[data-scale="1.15"]' in css
+    assert 'html[data-scale="1.25"]' in css
+    assert ":focus-visible" in css
+    assert ".fila-stock-bajo" in css
+    assert ".fila-stock-agotado" in css
+
+    # Motor i18n, preferencias en sessionStorage, atajos y BI anti-superposición en JS.
+    assert "TRADUCCIONES_WEB" in js
+    assert "ROLES_A_EN" in js
+    assert "alternarIdiomaWeb" in js
+    assert "alternarTemaWeb" in js
+    assert "alternarAltoContrasteWeb" in js
+    assert "ajustarEscalaWeb" in js
+    assert "sessionStorage" in js
+    assert "localStorage." not in js
+    assert "acortarEtiquetaBI" in js
+    assert "obtenerTokensCanvas" in js
+    assert 'evento.key === "Escape"' in js

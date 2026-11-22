@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List
+from typing import List, Optional
 from src.dominio.entidades import Factura
 from src.dominio.puertos import PuertoRepositorioVentas
 
@@ -9,15 +9,14 @@ from src.dominio.puertos import PuertoRepositorioVentas
 #  DECISIÓN DE DISEÑO (INMUTABILIDAD Y AUDITORÍA):
 #
 #   Este repositorio se encarga de persistir las transacciones comerciales.
-#  
-#   Como una factura es un documento legal/contable, no existe un método 
+#
+#   Como una factura es un documento legal/contable, no existe un método
 #   'modificar'. Si ocurre un error, se "anula" (soft delete) y se emite una nueva.
 # ==================================================================================
 
 
-
 class RepositorioVentasSQL(PuertoRepositorioVentas):
-    
+
     def __init__(self, conexion: sqlite3.Connection):
         """
          Recibe la conexión activa inyectada por el GestorSQLite (Unidad de Trabajo).
@@ -27,84 +26,72 @@ class RepositorioVentasSQL(PuertoRepositorioVentas):
     def guardar(self, factura: Factura) -> int:
         """
          Registra un comprobante de venta en la base de datos.
-        
-         Nota de diseño: Le pedimos a la entidad de dominio que calcule su 
-         propio total con sus reglas de negocio antes de guardar, y dejamos 
-         que el motor SQLite asigne la fecha exacta con CURRENT_TIMESTAMP.
+         La columna 'total' se delega a GENERATED ALWAYS AS en SQLite.
         """
         cursor = self.conexion.cursor()
-        
-        # 1. Ejecutamos la regla de negocio encapsulada.
-        # Aunque SQLite calcula el total físico en disco, ejecutamos esto para que 
-        # el Dominio valide matemáticamente los montos (ej. que no haya precios negativos).
-        factura.calcular_total_estimado()
-        
-        # 2. Insertamos la transacción física.
 
-        # ----------------------------------------------------------------------------
-        # CAMBIO APLICADO:
-        #  
-        # - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
-        # - Se quitó la inserción manual de la columna 'total' ya que SQLite 
-        #   la genera automáticamente (GENERATED ALWAYS AS) según el esquema.sql.
-        # ----------------------------------------------------------------------------
+        # Ejecutamos la regla de negocio encapsulada para validar los montos en Dominio.
+        factura.calcular_total_estimado()
 
         cursor.execute('''
             INSERT INTO facturacion (
-                id_vendedor, id_cliente, id_producto, 
+                id_vendedor, id_cliente, id_producto,
                 cantidad, valor, descuento, habilitado
             ) VALUES (?, ?, ?, ?, ?, ?, 1)
         ''', (
-            factura.id_vendedor, 
-            factura.id_cliente, 
-            factura.id_producto, 
-            factura.cantidad, 
-            factura.valor, 
+            factura.id_vendedor,
+            factura.id_cliente,
+            factura.id_producto,
+            factura.cantidad,
+            factura.valor,
             factura.descuento
         ))
-        
+
         return cursor.lastrowid
+
+    def obtener_por_id(self, id_factura: int) -> Optional[Factura]:
+        """
+         Recupera una factura activa por su clave primaria (PK).
+         Requerido para restituir atómicamente el stock al anular un comprobante
+         y prevenir anulaciones duplicadas sobre comprobantes ya deshabilitados.
+        """
+        cursor = self.conexion.cursor()
+        cursor.execute('''
+            SELECT id, id_vendedor, id_cliente, id_producto,
+                   cantidad, valor, descuento, fecha, total, habilitado
+            FROM facturacion
+            WHERE id = ? AND habilitado = 1
+        ''', (id_factura,))
+
+        fila = cursor.fetchone()
+        return self._mapear_a_entidad(fila) if fila else None
 
     def eliminar(self, id_factura: int) -> None:
         """
          Aplica el Borrado Lógico (Soft Delete) cambiando habilitado a 0.
-         Representa la 'Anulación' de una venta, preservando el registro 
+         Representa la 'Anulación' de una venta, preservando el registro
          histórico para auditoría y analítica.
         """
         cursor = self.conexion.cursor()
-        
-        # ----------------------------------------------------------------------------
-        # CAMBIO APLICADO:
-        #  
-        # - Se corrigió el nombre de la tabla ('facturacion' en lugar de 'facturas').
-        # ----------------------------------------------------------------------------
-        
         cursor.execute("UPDATE facturacion SET habilitado = 0 WHERE id = ?", (id_factura,))
 
-    # ------------------------------------------------------------------------------
-    # CAMBIO APLICADO:
-    #  
-    # Se implementó el método 'listar_todos' exigido por el puerto actualizado.
-    # Obtiene todas las facturas activas (no anuladas) para alimentar el módulo BI.
-    # ------------------------------------------------------------------------------
-    
     def listar_todos(self) -> List[Factura]:
         """
          Devuelve la lista completa del historial transaccional activo.
         """
         cursor = self.conexion.cursor()
         cursor.execute('''
-            SELECT id, id_vendedor, id_cliente, id_producto, 
+            SELECT id, id_vendedor, id_cliente, id_producto,
                    cantidad, valor, descuento, fecha, total, habilitado
             FROM facturacion
             WHERE habilitado = 1
         ''')
-        
+
         return [self._mapear_a_entidad(fila) for fila in cursor.fetchall()]
 
     def _mapear_a_entidad(self, fila: tuple) -> Factura:
         """
-         Función privada auxiliar. Transforma la tupla cruda que devuelve SQLite 
+         Función privada auxiliar. Transforma la tupla cruda que devuelve SQLite
          a nuestro objeto puro de negocio.
         """
         return Factura(

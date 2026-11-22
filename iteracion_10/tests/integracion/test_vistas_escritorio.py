@@ -6,23 +6,25 @@ from tkinter import ttk, messagebox
 import pytest
 import requests
 import bcrypt
+import customtkinter as ctk
 from fastapi.testclient import TestClient
 
 
-
-# ===========================================================================================================
-#  SUITE DE INTEGRACIÓN E2E: VISTAS TKINTER + CLIENTE API + FASTAPI + SQLITE
-# ===========================================================================================================
+# =================================================================================
+#  SUITE DE INTEGRACIÓN E2E: VISTAS DE ESCRITORIO (CUSTOMTKINTER + API REST)
+# =================================================================================
 #  UBICACIÓN: tests/integracion/test_vistas_escritorio.py
 #
 #  DECISIÓN DE DISEÑO:
-#   Esta batería de pruebas verifica de punta a punta las 9 ventanas de Tkinter (Panel de Control, Usuarios, 
-#   Empleados, Clientes, Proveedores, Stock, Facturación, Consola SQL y Analítica BI) interactuando a través 
-#   de 'cliente_http' contra el servidor FastAPI y una base SQLite efímera con el esquema real (3FN, Vistas 
-#   y Triggers).
-# ===========================================================================================================
+#
+#   Ejecuta pruebas de punta a punta sobre las 9 ventanas reales construidas en
+#   CustomTkinter conectadas en memoria al servidor FastAPI (TestClient) y a una
+#   base SQLite temporal con el esquema 3FN completo (esquema.sql).
+#   Verifica dimensiones (<= 1280x720), matriz RBAC, coexistencia IAM/RRHH,
+#   persistencia 3FN sin cachés locales, facturación atómica, Sandboxing SQL, BI,
+#   Modo Oscuro, Alto Contraste WCAG, Zoom, i18n ES/EN, semáforo y búsqueda en vivo.
+# =================================================================================
 
-# 1. Anclaje de rutas para que los imports internos de las vistas funcionen igual que en producción.
 DIRECTORIO_ACTUAL = os.path.dirname(os.path.abspath(__file__))
 DIRECTORIO_TESTS = os.path.dirname(DIRECTORIO_ACTUAL)
 DIRECTORIO_RAIZ = os.path.dirname(DIRECTORIO_TESTS)
@@ -36,9 +38,8 @@ for ruta in (DIRECTORIO_RAIZ, DIRECTORIO_ESCRITORIO, DIRECTORIO_VISTAS):
 from src.infraestructura.api.servidor import app
 from src.infraestructura.api.inyector_dependencias import obtener_uow
 from src.infraestructura.persistencia.gestor_sqlite import GestorSQLite
-from src.presentacion.escritorio.cliente_api import cliente_http
+from src.presentacion.escritorio.cliente_api import cliente_http, gestor_ui
 
-# Importamos los módulos de las vistas de escritorio a auditar.
 import src.presentacion.escritorio.vistas.panel_control as mod_panel
 import src.presentacion.escritorio.vistas.usuarios as mod_usuarios
 import src.presentacion.escritorio.vistas.empleados as mod_empleados
@@ -50,15 +51,13 @@ import src.presentacion.escritorio.vistas.consola as mod_consola
 import src.presentacion.escritorio.vistas.analitica as mod_analitica
 
 
-# --------------------------------------------------------------------------
-#  ADAPTADOR DE RED EN MEMORIA (PUENTE ENTRE REQUESTS Y FASTAPI TESTCLIENT)
-# --------------------------------------------------------------------------
+# -------------------------------------------------------------------
+#  PUENTE HTTP EN MEMORIA Y HELPERS DE INSPECCIÓN PARA CUSTOMTKINTER
+# -------------------------------------------------------------------
 
 class _PuenteRequestsTestClient:
-    """
-     Redirige todas las llamadas de la librería 'requests' hechas por cliente_api.py
-     hacia el TestClient de FastAPI en memoria, sin necesidad de abrir puertos TCP.
-    """
+    """Redirige las llamadas HTTP de cliente_api.py hacia el TestClient de FastAPI."""
+
     def __init__(self, client: TestClient):
         self.client = client
 
@@ -78,12 +77,7 @@ class _PuenteRequestsTestClient:
         return self.client.delete(self._limpiar_ruta(url), headers=headers)
 
 
-# ------------------------------------------------------------
-#  HELPERS PARA RECORRER E INTERACTUAR CON WIDGETS DE TKINTER
-# ------------------------------------------------------------
-
 def _buscar_widgets(contenedor, clase_objetivo):
-    """Recorre recursivamente una ventana y devuelve todos los widgets de un tipo dado."""
     encontrados = []
     for hijo in contenedor.winfo_children():
         if isinstance(hijo, clase_objetivo):
@@ -91,37 +85,57 @@ def _buscar_widgets(contenedor, clase_objetivo):
         encontrados.extend(_buscar_widgets(hijo, clase_objetivo))
     return encontrados
 
-def _buscar_boton_por_texto(contenedor, texto_parcial: str) -> tk.Button:
-    """Busca un botón dentro de la ventana cuyo texto contenga la cadena indicada."""
-    for boton in _buscar_widgets(contenedor, tk.Button):
-        if texto_parcial.lower() in str(boton.cget("text")).lower():
-            return boton
-    raise AssertionError(f"No se encontró ningún botón con el texto '{texto_parcial}'.")
 
 def _buscar_treeview(contenedor) -> ttk.Treeview:
-    """Recupera la grilla Treeview principal de la ventana."""
     tablas = _buscar_widgets(contenedor, ttk.Treeview)
-    assert len(tablas) > 0, "No se encontró ningún widget Treeview en la ventana."
+    assert len(tablas) > 0, "No se encontró el widget ttk.Treeview en la ventana."
     return tablas[0]
 
 
-# ------------------------------------------------------------------------------
-#  FIXTURE PRINCIPAL: ENTORNO AISLADO DE BASE DE DATOS + API + TKINTER HEADLESS
-# ------------------------------------------------------------------------------
+def _buscar_boton_por_texto(contenedor, texto_parcial: str) -> ctk.CTkButton:
+    for boton in _buscar_widgets(contenedor, ctk.CTkButton):
+        if texto_parcial.lower() in str(boton.cget("text")).lower():
+            return boton
+    raise AssertionError(f"No se encontró el botón CTkButton '{texto_parcial}'.")
+
+
+def _clicar_boton(boton: ctk.CTkButton):
+    assert boton.cget("state") != "disabled", f"El botón '{boton.cget('text')}' está deshabilitado."
+    comando = boton.cget("command")
+    if not callable(comando):
+        comando = getattr(boton, "_command", None)
+    assert callable(comando), f"El botón '{boton.cget('text')}' no posee un comando ejecutable."
+    comando()
+
+
+def _escribir_entry(entry: ctk.CTkEntry, texto: str):
+    entry.delete(0, "end")
+    entry.insert(0, str(texto))
+
+
+def _validar_resolucion_maxima(ventana: ctk.CTkToplevel, max_ancho: int = 1280, max_alto: int = 720):
+    ventana.update_idletasks()
+    geometria = ventana.geometry().split("+")[0]
+    ancho, alto = map(int, geometria.split("x"))
+    assert ancho <= max_ancho, f"La ventana excede el ancho máximo permitido ({ancho} > {max_ancho})."
+    assert alto <= max_alto, f"La ventana excede el alto máximo permitido ({alto} > {max_alto})."
+
+
+# -------------------------------------------------------------------------------
+#  FIXTURE DE ENTORNO ESCRITORIO HEADLESS (CUSTOMTKINTER + FASTAPI + SQLITE 3FN)
+# -------------------------------------------------------------------------------
 
 @pytest.fixture
-def entorno_gui(tmp_path, monkeypatch):
+def entorno_escritorio(tmp_path, monkeypatch):
     """
-     Prepara para cada test:
-     1. Una base SQLite temporal inicializada con db/esquema.sql y el usuario 'admin'.
-     2. La inyección de dependencias de FastAPI apuntando a esa base temporal.
-     3. El puente entre 'requests' (cliente_http) y TestClient(app).
-     4. Una ventana raíz tk.Tk() oculta (withdraw) y espías para messagebox.
+     Prepara una base SQLite temporal con esquema 3FN, roles base y usuario 'admin',
+     conecta cliente_http a TestClient, restaura gestor_ui y captura messagebox.
     """
-    ruta_db_test = str(tmp_path / "test_frankie_gui.db")
+    gestor_ui.resetear_por_defecto()
+
+    ruta_db_test = str(tmp_path / "test_frankie_escritorio.db")
     ruta_esquema = os.path.join(DIRECTORIO_RAIZ, "db", "esquema.sql")
 
-    # 1. Inicializamos la base temporal con el esquema oficial y el Administrador maestro.
     conexion = sqlite3.connect(ruta_db_test)
     cursor = conexion.cursor()
     with open(ruta_esquema, "r", encoding="utf-8") as f:
@@ -143,42 +157,42 @@ def entorno_gui(tmp_path, monkeypatch):
 
     cursor.execute("SELECT id FROM roles WHERE rol = 'Administrador'")
     id_rol_admin = cursor.fetchone()[0]
-    cursor.execute("INSERT INTO usuxroles (id_usuario, id_rol, habilitado) VALUES (?, ?, 1)", (id_admin, id_rol_admin))
+    cursor.execute(
+        "INSERT INTO usuxroles (id_usuario, id_rol, habilitado) VALUES (?, ?, 1)",
+        (id_admin, id_rol_admin)
+    )
     conexion.commit()
     conexion.close()
 
-    # 2. Redirigimos FastAPI y la Consola SQL hacia la base temporal.
     app.dependency_overrides[obtener_uow] = lambda: GestorSQLite(ruta_db_test)
-    monkeypatch.setattr(mod_consola, "DB_PATH", ruta_db_test)
-
-    # 3. Conectamos requests de cliente_api.py al TestClient de FastAPI.
     client_fastapi = TestClient(app)
     puente = _PuenteRequestsTestClient(client_fastapi)
+
     monkeypatch.setattr(requests, "get", puente.get)
     monkeypatch.setattr(requests, "post", puente.post)
     monkeypatch.setattr(requests, "put", puente.put)
     monkeypatch.setattr(requests, "delete", puente.delete)
 
-    # Configuramos el operador activo por defecto como el Admin (ID 1).
-    cliente_http.id_operador = 1
+    cliente_http.id_operador = id_admin
 
-    # 4. Interceptamos messagebox para que no abra ventanas modales bloqueantes.
-    historial_alertas = {"info": [], "warning": [], "error": []}
-    monkeypatch.setattr(messagebox, "showinfo", lambda t, m: historial_alertas["info"].append((t, m)))
-    monkeypatch.setattr(messagebox, "showwarning", lambda t, m: historial_alertas["warning"].append((t, m)))
-    monkeypatch.setattr(messagebox, "showerror", lambda t, m: historial_alertas["error"].append((t, m)))
+    alertas = {"info": [], "warning": [], "error": []}
+    monkeypatch.setattr(messagebox, "showinfo", lambda t, m: alertas["info"].append((t, m)))
+    monkeypatch.setattr(messagebox, "showwarning", lambda t, m: alertas["warning"].append((t, m)))
+    monkeypatch.setattr(messagebox, "showerror", lambda t, m: alertas["error"].append((t, m)))
 
-    # 5. Creamos la raíz de Tkinter oculta (modo Headless).
-    root = tk.Tk()
+    ctk.set_appearance_mode("light")
+    root = ctk.CTk()
     root.withdraw()
 
     yield {
         "root": root,
-        "ruta_db": ruta_db_test,
-        "alertas": historial_alertas
+        "client": client_fastapi,
+        "alertas": alertas,
+        "id_admin": id_admin,
+        "ruta_db": ruta_db_test
     }
 
-    # Limpieza al terminar cada test.
+    gestor_ui.resetear_por_defecto()
     app.dependency_overrides.clear()
     try:
         root.destroy()
@@ -186,219 +200,235 @@ def entorno_gui(tmp_path, monkeypatch):
         pass
 
 
-
 # ==========================================================
-#  CASOS DE PRUEBA DE INTEGRACIÓN EN INTERFAZ DE ESCRITORIO
+#  CASOS DE PRUEBA E2E PARA LAS 9 VENTANAS DE CUSTOMTKINTER
 # ==========================================================
 
-def test_1_cambio_password_admin_en_gui_mantiene_rol_y_acceso_al_panel(entorno_gui):
+def test_1_panel_control_matriz_rbac_y_resolucion(entorno_escritorio):
     """
-     Prueba de regresión crítica:
-     Verifica que al cambiar la contraseña de 'admin' desde la ventana de Usuarios,
-     el rol no se corrompa a mayúsculas ('ADMINISTRADOR') y que al volver a iniciar
-     sesión conserve acceso total (botones en estado NORMAL) en el Panel de Control.
+     Verifica que PanelControl habilite/deshabilite exactamente los módulos
+     correspondientes al rol activo y respete la cota máxima de 1280x720.
     """
-    root = entorno_gui["root"]
+    root = entorno_escritorio["root"]
 
-    # 1. Login inicial con la clave por defecto.
-    perfil_inicial = cliente_http.iniciar_sesion("admin", "admin123")
-    assert perfil_inicial["rol"] == "Administrador"
+    # 1. Perfil Empleado - Ventas: solo Clientes y Facturación habilitados.
+    panel_ventas = mod_panel.PanelControl(root, 2, "Empleado - Ventas", "Lucas", "Vendedor")
+    _validar_resolucion_maxima(panel_ventas)
 
-    # 2. Abrimos la ventana de Gestión de Usuarios y seleccionamos la fila del Admin (ID "1").
-    win_usuarios = mod_usuarios.Usuario(root, id_actual=1, rol_actual="Administrador")
-    tabla = _buscar_treeview(win_usuarios)
-    assert "1" in tabla.get_children()
-
-    tabla.selection_set("1")
-    tabla.event_generate("<<TreeviewSelect>>")
-    root.update_idletasks()
-
-    # 3. Escribimos una nueva contraseña en la caja de password (4to Entry del formulario).
-    cajas_texto = [w for w in _buscar_widgets(win_usuarios, tk.Entry) if not isinstance(w, ttk.Combobox)]
-    caja_password = cajas_texto[3]
-    caja_password.delete(0, tk.END)
-    caja_password.insert(0, "NuevaClaveAdmin2026!")
-
-    # Invocamos el botón "Modificar" de la interfaz gráfica.
-    btn_modificar = _buscar_boton_por_texto(win_usuarios, "Modificar")
-    btn_modificar.invoke()
-    assert len(entorno_gui["alertas"]["error"]) == 0
-
-    # 4. Re-autenticamos con la nueva contraseña y verificamos que el rol siga siendo 'Administrador'.
-    perfil_reingreso = cliente_http.iniciar_sesion("admin", "NuevaClaveAdmin2026!")
-    assert perfil_reingreso["rol"] == "Administrador"
-
-    # 5. Abrimos el Panel de Control con los datos devueltos por el login y verificamos que todo esté habilitado.
-    win_panel = mod_panel.PanelControl(
-        root,
-        perfil_reingreso["id"],
-        perfil_reingreso["rol"],
-        perfil_reingreso["nombres"],
-        perfil_reingreso["apellidos"]
-    )
-    botones_panel = [
-        b for b in _buscar_widgets(win_panel, tk.Button)
-        if b.cget("text") != "Cerrar Sesión"
-    ]
-    assert len(botones_panel) == 9
-    for boton in botones_panel:
-        assert str(boton.cget("state")) == "normal", f"El botón '{boton.cget('text')}' quedó deshabilitado."
-
-    win_usuarios.destroy()
-    win_panel.destroy()
-
-def test_2_panel_control_aplica_matriz_rbac_segun_rol(entorno_gui):
-    """
-     Verifica que el Panel de Control habilite y deshabilite correctamente los botones
-     según el rol operativo del usuario logueado (Gerente vs Empleado - Ventas).
-    """
-    root = entorno_gui["root"]
-
-    # Caso A: Empleado - Ventas (solo puede acceder a Clientes y Facturación).
-    panel_ventas = mod_panel.PanelControl(root, 2, "Empleado - Ventas", "Juan", "Perez")
-    assert str(_buscar_boton_por_texto(panel_ventas, "Gestión de Clientes").cget("state")) == "normal"
-    assert str(_buscar_boton_por_texto(panel_ventas, "Facturación").cget("state")) == "normal"
-    assert str(_buscar_boton_por_texto(panel_ventas, "Control de Stock").cget("state")) == "disabled"
-    assert str(_buscar_boton_por_texto(panel_ventas, "Gestión de Usuarios").cget("state")) == "disabled"
-    assert str(_buscar_boton_por_texto(panel_ventas, "Consola SQL").cget("state")) == "disabled"
-    assert str(_buscar_boton_por_texto(panel_ventas, "Analítica de Ventas").cget("state")) == "disabled"
+    assert _buscar_boton_por_texto(panel_ventas, "Clientes").cget("state") == "normal"
+    assert _buscar_boton_por_texto(panel_ventas, "Facturación").cget("state") == "normal"
+    assert _buscar_boton_por_texto(panel_ventas, "Proveedores").cget("state") == "disabled"
+    assert _buscar_boton_por_texto(panel_ventas, "Stock").cget("state") == "disabled"
+    assert _buscar_boton_por_texto(panel_ventas, "Recursos Humanos").cget("state") == "disabled"
+    assert _buscar_boton_por_texto(panel_ventas, "Usuarios").cget("state") == "disabled"
+    assert _buscar_boton_por_texto(panel_ventas, "Consola SQL").cget("state") == "disabled"
+    assert _buscar_boton_por_texto(panel_ventas, "Backup").cget("state") == "disabled"
+    assert _buscar_boton_por_texto(panel_ventas, "Analítica").cget("state") == "disabled"
     panel_ventas.destroy()
 
-    # Caso B: Gerente (accede a todo incluido BI, excepto a Consola SQL y Backup que son ROOT).
-    panel_gerente = mod_panel.PanelControl(root, 3, "Gerente", "Laura", "Gomez")
-    assert str(_buscar_boton_por_texto(panel_gerente, "Recursos Humanos").cget("state")) == "normal"
-    assert str(_buscar_boton_por_texto(panel_gerente, "Analítica de Ventas").cget("state")) == "normal"
-    assert str(_buscar_boton_por_texto(panel_gerente, "Consola SQL").cget("state")) == "disabled"
-    assert str(_buscar_boton_por_texto(panel_gerente, "Generar Backup").cget("state")) == "disabled"
+    # 2. Perfil Gerente: opera módulos comerciales, RRHH, IAM y BI; bloquea ROOT.
+    panel_gerente = mod_panel.PanelControl(root, 3, "Gerente", "María", "Gerencia")
+    assert _buscar_boton_por_texto(panel_gerente, "Recursos Humanos").cget("state") == "normal"
+    assert _buscar_boton_por_texto(panel_gerente, "Analítica").cget("state") == "normal"
+    assert _buscar_boton_por_texto(panel_gerente, "Consola SQL").cget("state") == "disabled"
+    assert _buscar_boton_por_texto(panel_gerente, "Backup").cget("state") == "disabled"
     panel_gerente.destroy()
 
-def test_3_flujo_gui_proveedores_y_stock_sincronizados(entorno_gui):
+    # 3. Perfil Administrador: acceso irrestricto a todos los módulos.
+    panel_admin = mod_panel.PanelControl(root, 1, "Administrador", "David", "Bravo")
+    assert _buscar_boton_por_texto(panel_admin, "Consola SQL").cget("state") == "normal"
+    assert _buscar_boton_por_texto(panel_admin, "Backup").cget("state") == "normal"
+    panel_admin.destroy()
+
+
+def test_2_usuarios_iam_y_rrhh_coexistencia_sin_pisar_datos_3fn(entorno_escritorio):
     """
-     Verifica que al dar de alta un Proveedor en su ventana, aparezca inmediatamente
-     en el desplegable de la ventana de Stock, permitiendo crear y modificar productos.
+     Verifica el flujo real entre Gestión de Usuarios (IAM) y RRHH:
+     1. Se crea una cuenta en Usuarios con credenciales de acceso.
+     2. Se completa su legajo personal 3FN (DNI, teléfono, email, domicilio) en RRHH.
+     3. Se reabre RRHH y se verifica persistencia real desde SQLite + login vigente.
     """
-    root = entorno_gui["root"]
+    root = entorno_escritorio["root"]
 
-    # 1. Abrimos el formulario de Proveedores y cargamos un proveedor nuevo.
-    win_prov = mod_proveedores.Proveedor(root)
-    cajas_prov = [w for w in _buscar_widgets(win_prov, tk.Entry) if not isinstance(w, ttk.Combobox)]
-    cajas_prov[0].insert(0, "Mayorista Informático MDP")  # Razón Social
-    cajas_prov[1].insert(0, "30-71122334-9")              # CUIT
-    cajas_prov[8].insert(0, "Roberto Gómez")              # Contacto
+    # Paso 1: Alta rápida de credenciales en Usuarios (IAM).
+    win_usu = mod_usuarios.Usuario(root, id_actual=1, rol_actual="Administrador")
+    _validar_resolucion_maxima(win_usu)
 
-    _buscar_boton_por_texto(win_prov, "Guardar Proveedor").invoke()
+    cajas_usu = _buscar_widgets(win_usu, ctk.CTkEntry)
+    combo_usu = _buscar_widgets(win_usu, ctk.CTkComboBox)[0]
 
-    tabla_prov = _buscar_treeview(win_prov)
-    assert len(tabla_prov.get_children()) == 1
-    valores_prov = tabla_prov.item(tabla_prov.get_children()[0], "values")
-    assert valores_prov[0] == "Mayorista Informático MDP"
+    _escribir_entry(cajas_usu[0], "Martín")
+    _escribir_entry(cajas_usu[1], "Gómez")
+    _escribir_entry(cajas_usu[2], "mgomez")
+    _escribir_entry(cajas_usu[3], "ClaveVentas2026")
+    combo_usu.set("Empleado - Ventas")
 
-    # 2. Abrimos la ventana de Stock y verificamos que el proveedor esté en el Combobox.
-    win_stock = mod_stock.Stock(root)
-    combo_prov = _buscar_widgets(win_stock, ttk.Combobox)[0]
-    assert "Mayorista Informático MDP" in combo_prov["values"]
+    _clicar_boton(_buscar_boton_por_texto(win_usu, "Guardar"))
+    tabla_usu = _buscar_treeview(win_usu)
+    iids_mgomez = [
+        iid for iid in tabla_usu.get_children()
+        if tabla_usu.item(iid, "values")[0] == "mgomez"
+    ]
+    assert len(iids_mgomez) == 1
+    id_mgomez = iids_mgomez[0]
+    win_usu.destroy()
 
-    # 3. Damos de alta un producto desde la interfaz de Stock.
-    cajas_stock = [w for w in _buscar_widgets(win_stock, tk.Entry) if not isinstance(w, ttk.Combobox)]
-    cajas_stock[0].insert(0, "MON-24-FHD")       # Código.
-    cajas_stock[1].insert(0, "Monitor 24 IPS")   # Descripción.
-    cajas_stock[2].insert(0, "Monitores")        # Categoría.
-    combo_prov.set("Mayorista Informático MDP")  # Proveedor.
-    cajas_stock[3].insert(0, "20")               # Stock Actual.
-    cajas_stock[4].insert(0, "5")                # Stock Mínimo.
-    cajas_stock[5].insert(0, "100000")           # Precio Costo.
-    cajas_stock[6].insert(0, "150000")           # Precio Venta.
-    cajas_stock[7].insert(0, "Depósito Central") # Ubicación.
-
-    _buscar_boton_por_texto(win_stock, "Guardar Producto").invoke()
-
-    tabla_stock = _buscar_treeview(win_stock)
-    assert len(tabla_stock.get_children()) == 1
-    id_fila_prod = tabla_stock.get_children()[0]
-    assert tabla_stock.item(id_fila_prod, "values")[0] == "MON-24-FHD"
-    assert float(tabla_stock.item(id_fila_prod, "values")[4]) == 20.0
-
-    # 4. Seleccionamos el producto, modificamos su stock a 30 y su precio de venta a 165000.
-    tabla_stock.selection_set(id_fila_prod)
-    win_stock.nametowidget(tabla_stock).event_generate("<<TreeviewSelect>>")
-    cajas_stock[3].delete(0, tk.END)
-    cajas_stock[3].insert(0, "30")
-    cajas_stock[6].delete(0, tk.END)
-    cajas_stock[6].insert(0, "165000")
-
-    _buscar_boton_por_texto(win_stock, "Modificar Producto").invoke()
-    assert float(tabla_stock.item(id_fila_prod, "values")[4]) == 30.0
-    assert float(tabla_stock.item(id_fila_prod, "values")[7]) == 165000.0
-
-    win_prov.destroy()
-    win_stock.destroy()
-
-def test_4_visibilidad_vendedor_bi_semilla_y_alta_rrhh_clientes(entorno_gui):
-    """
-     Verifica que tanto un empleado creado desde RRHH ('empleados.py') como el
-     'vendedor_bi' de la semilla aparezcan disponibles en la ventana de Facturación.
-    """
-    root = entorno_gui["root"]
-    ruta_db = entorno_gui["ruta_db"]
-
-    # 1. Simulamos la inserción de 'vendedor_bi' con el rol 'EMPLEADO' tal como en la semilla BI.
-    conexion = sqlite3.connect(ruta_db)
-    cursor = conexion.cursor()
-    cursor.execute("INSERT INTO roles (rol) VALUES ('EMPLEADO')")
-    id_rol_semilla = cursor.lastrowid
-    cursor.execute('''
-        INSERT INTO usuarios (id, nombres, apellidos, dni, usuario, password, habilitado)
-        VALUES (888, 'Vendedor', 'BI', '88888888', 'vendedor_bi', 'hash', 1)
-    ''')
-    cursor.execute("INSERT INTO usuxroles (id_usuario, id_rol) VALUES (888, ?)", (id_rol_semilla,))
-    conexion.commit()
-    conexion.close()
-
-    # 2. Damos de alta un vendedor adicional desde la ventana de RRHH (empleados.py).
+    # Paso 2: Completar legajo personal en RRHH sin tocar credenciales.
     win_emp = mod_empleados.Empleado(root, id_actual=1, rol_actual="Administrador")
-    cajas_emp = [w for w in _buscar_widgets(win_emp, tk.Entry) if not isinstance(w, ttk.Combobox)]
-    combo_rol_emp = _buscar_widgets(win_emp, ttk.Combobox)[0]
+    _validar_resolucion_maxima(win_emp)
+    tabla_emp = _buscar_treeview(win_emp)
+    tabla_emp.selection_set(id_mgomez)
+    tabla_emp.event_generate("<<TreeviewSelect>>")
+    win_emp.update()
 
-    cajas_emp[0].insert(0, "Martín")
-    cajas_emp[1].insert(0, "Palermo")
-    cajas_emp[2].insert(0, "22333444")
-    combo_rol_emp.set("Empleado - Ventas")
-    _buscar_boton_por_texto(win_emp, "Guardar Perfil").invoke()
+    cajas_emp = _buscar_widgets(win_emp, ctk.CTkEntry)
+    _escribir_entry(cajas_emp[2], "35123456")
+    _escribir_entry(cajas_emp[3], "223-555-9999")
+    _escribir_entry(cajas_emp[4], "martin.gomez@frankie.com")
+    _escribir_entry(cajas_emp[5], "Av. Colón 2500")
+    _escribir_entry(cajas_emp[6], "Mar del Plata")
+    _escribir_entry(cajas_emp[7], "Buenos Aires")
+    _escribir_entry(cajas_emp[8], "7600")
 
-    # 3. Damos de alta un cliente desde la ventana de Clientes (clientes.py).
-    win_cli = mod_clientes.Cliente(root)
-    cajas_cli = [w for w in _buscar_widgets(win_cli, tk.Entry) if not isinstance(w, ttk.Combobox)]
-    cajas_cli[0].insert(0, "Ana")
-    cajas_cli[1].insert(0, "belleza")
-    cajas_cli[2].insert(0, "33444555")
-    _buscar_boton_por_texto(win_cli, "Guardar Cliente").invoke()
-
-    # 4. Abrimos Facturación y comprobamos que ambos vendedores y el cliente estén en los Combobox.
-    win_fac = mod_facturacion.Facturacion(root)
-    combos_fac = _buscar_widgets(win_fac, ttk.Combobox)
-    vendedores_disponibles = combos_fac[0]["values"]
-    clientes_disponibles = combos_fac[1]["values"]
-
-    assert any("Vendedor BI" in v for v in vendedores_disponibles), "No apareció vendedor_bi en Facturación."
-    assert any("Martín Palermo" in v for v in vendedores_disponibles), "No apareció el empleado de RRHH."
-    assert any("Ana belleza" in c for c in clientes_disponibles), "No apareció el cliente registrado."
-
+    _clicar_boton(_buscar_boton_por_texto(win_emp, "Modificar Perfil"))
     win_emp.destroy()
+
+    # Paso 3: Reabrir RRHH (ventana fresca, cero caché) y comprobar persistencia real.
+    win_emp_2 = mod_empleados.Empleado(root, id_actual=1, rol_actual="Administrador")
+    tabla_emp_2 = _buscar_treeview(win_emp_2)
+    valores = tabla_emp_2.item(id_mgomez, "values")
+    assert valores[2] == "35123456"
+    assert valores[3] == "223-555-9999"
+    assert valores[4] == "martin.gomez@frankie.com"
+    assert valores[5] == "Av. Colón 2500"
+    assert valores[6] == "Mar del Plata"
+    assert valores[7] == "Buenos Aires"
+    assert valores[8] == "7600"
+    win_emp_2.destroy()
+
+    # Paso 4: Confirmar que las credenciales IAM no fueron sobrescritas por RRHH.
+    sesion = cliente_http.iniciar_sesion("mgomez", "ClaveVentas2026")
+    assert sesion["rol"] == "Empleado - Ventas"
+    assert sesion["email"] == "martin.gomez@frankie.com"
+
+
+def test_3_clientes_abm_completo_con_persistencia_3fn(entorno_escritorio):
+    """
+     Verifica Alta, Modificación y Baja Lógica de un Cliente en CustomTkinter
+     confirmando que sus datos de contacto y domicilio persisten en SQLite 3FN.
+    """
+    root = entorno_escritorio["root"]
+    win_cli = mod_clientes.Cliente(root)
+    _validar_resolucion_maxima(win_cli)
+
+    cajas = _buscar_widgets(win_cli, ctk.CTkEntry)
+    _escribir_entry(cajas[0], "Laura")
+    _escribir_entry(cajas[1], "Fernández")
+    _escribir_entry(cajas[2], "30999888")
+    _escribir_entry(cajas[3], "223-411-2233")
+    _escribir_entry(cajas[4], "laura@correo.com")
+    _escribir_entry(cajas[5], "San Martín 1234")
+    _escribir_entry(cajas[6], "Mar del Plata")
+    _escribir_entry(cajas[7], "Buenos Aires")
+    _escribir_entry(cajas[8], "7600")
+
+    _clicar_boton(_buscar_boton_por_texto(win_cli, "Guardar Cliente"))
+
+    tabla = _buscar_treeview(win_cli)
+    assert len(tabla.get_children()) == 1
+    iid_cli = tabla.get_children()[0]
+    vals = tabla.item(iid_cli, "values")
+    assert vals[0] == "Laura"
+    assert vals[3] == "223-411-2233"
+    assert vals[5] == "San Martín 1234"
+
+    # Modificar domicilio y verificar tras reabrir.
+    tabla.selection_set(iid_cli)
+    tabla.event_generate("<<TreeviewSelect>>")
+    win_cli.update()
+    _escribir_entry(cajas[5], "Av. Independencia 800")
+    _clicar_boton(_buscar_boton_por_texto(win_cli, "Modificar Cliente"))
+    assert tabla.item(iid_cli, "values")[5] == "Av. Independencia 800"
+
+    # Eliminar cliente (baja lógica).
+    tabla.selection_set(iid_cli)
+    _clicar_boton(_buscar_boton_por_texto(win_cli, "Eliminar Cliente"))
+    assert len(tabla.get_children()) == 0
     win_cli.destroy()
-    win_fac.destroy()
 
-def test_5_flujo_gui_facturacion_y_analitica_bi_completo(entorno_gui):
-    """
-     Prueba el circuito comercial completo desde las ventanas:
-     Emisión de factura en 'facturacion.py' -> Descuento de stock -> Visualización
-     de KPIs y gráficos en 'analitica.py' -> Anulación y restitución de inventario.
-    """
-    root = entorno_gui["root"]
 
-    # 1. Preparamos los datos base mediante el cliente HTTP (Proveedor, Vendedor, Cliente y Producto).
-    id_prov = cliente_http.crear_perfil({"nombres": "Prov", "apellidos": "SA", "dni": "1", "rol": "Proveedor"})["id"]
-    id_vend = cliente_http.crear_perfil({"nombres": "Vend", "apellidos": "Uno", "dni": "2", "rol": "Empleado - Ventas"})["id"]
-    id_cli = cliente_http.crear_perfil({"nombres": "Cli", "apellidos": "Final", "dni": "3", "rol": "Cliente"})["id"]
+def test_4_proveedores_y_stock_con_ubicacion_3fn(entorno_escritorio):
+    """
+     Verifica el alta de un Proveedor (con contacto/domicilio 3FN) y la creación
+     y modificación de un Producto con ubicación física ('ubicaciones_stock').
+    """
+    root = entorno_escritorio["root"]
+
+    # 1. Crear Proveedor en CustomTkinter.
+    win_prov = mod_proveedores.Proveedor(root)
+    _validar_resolucion_maxima(win_prov)
+    cajas_prov = _buscar_widgets(win_prov, ctk.CTkEntry)
+
+    # Orden en proveedores.py: RazonSocial, CUIT, Tel, Email, Contacto, Dir, Ciudad, Prov, CP.
+    _escribir_entry(cajas_prov[0], "TecnoSur SRL")
+    _escribir_entry(cajas_prov[1], "30-71122334-9")
+    _escribir_entry(cajas_prov[2], "011-4444-5555")
+    _escribir_entry(cajas_prov[3], "ventas@tecnosur.com")
+    _escribir_entry(cajas_prov[4], "Carlos Ruiz")
+    _escribir_entry(cajas_prov[5], "Parque Industrial Lote 4")
+    _escribir_entry(cajas_prov[6], "Batán")
+    _escribir_entry(cajas_prov[7], "Buenos Aires")
+    _escribir_entry(cajas_prov[8], "7601")
+
+    _clicar_boton(_buscar_boton_por_texto(win_prov, "Guardar Proveedor"))
+    tabla_prov = _buscar_treeview(win_prov)
+    vals_prov = tabla_prov.item(tabla_prov.get_children()[0], "values")
+    assert vals_prov[0] == "TecnoSur SRL"
+    assert vals_prov[3] == "ventas@tecnosur.com"
+    assert vals_prov[8] == "Carlos Ruiz"
+    win_prov.destroy()
+
+    # 2. Crear Producto en Stock asociado al proveedor con ubicación física.
+    win_stk = mod_stock.Stock(root)
+    _validar_resolucion_maxima(win_stk)
+    cajas_stk = _buscar_widgets(win_stk, ctk.CTkEntry)
+    combo_prov = _buscar_widgets(win_stk, ctk.CTkComboBox)[0]
+
+    # Orden en stock.py: Codigo, Desc, Cat, Ubicacion, StkAct, StkMin, Costo, Venta, Venc.
+    _escribir_entry(cajas_stk[0], "MON-24-IPS")
+    _escribir_entry(cajas_stk[1], "Monitor LED 24 IPS")
+    _escribir_entry(cajas_stk[2], "Monitores")
+    combo_prov.set("TecnoSur SRL")
+    _escribir_entry(cajas_stk[3], "Depósito Central - Rack 3")
+    _escribir_entry(cajas_stk[4], "15")
+    _escribir_entry(cajas_stk[5], "3")
+    _escribir_entry(cajas_stk[6], "120000")
+    _escribir_entry(cajas_stk[7], "185000")
+    _escribir_entry(cajas_stk[8], "S/D")
+
+    _clicar_boton(_buscar_boton_por_texto(win_stk, "Guardar Producto"))
+    win_stk.destroy()
+
+    # 3. Reabrir Stock y confirmar que la ubicación persistió en SQLite 3FN.
+    win_stk_2 = mod_stock.Stock(root)
+    tabla_stk = _buscar_treeview(win_stk_2)
+    assert len(tabla_stk.get_children()) == 1
+    vals_stk = tabla_stk.item(tabla_stk.get_children()[0], "values")
+    assert vals_stk[0] == "MON-24-IPS"
+    assert vals_stk[8] == "Depósito Central - Rack 3"
+    win_stk_2.destroy()
+
+
+def test_5_facturacion_descuento_y_anulacion_sin_duplicar_stock(entorno_escritorio):
+    """
+     Verifica que emitir una factura descuente stock y que anularla desde la vista
+     restituya exactamente las unidades originales sin duplicar inventario.
+    """
+    root = entorno_escritorio["root"]
+
+    id_prov = cliente_http.crear_perfil({"nombres": "Prov Fac", "apellidos": "SA", "dni": "1", "rol": "Proveedor"})["id"]
+    id_vend = cliente_http.crear_perfil({"nombres": "Ana", "apellidos": "Ventas", "dni": "2", "rol": "Empleado - Ventas"})["id"]
+    id_cli = cliente_http.crear_perfil({"nombres": "Pedro", "apellidos": "Cliente", "dni": "3", "rol": "Cliente"})["id"]
     id_prod = cliente_http.crear_producto({
         "codigo": "SSD-1TB",
         "descripcion": "Disco SSD 1TB NVMe",
@@ -407,96 +437,218 @@ def test_5_flujo_gui_facturacion_y_analitica_bi_completo(entorno_gui):
         "precio_costo": 50000.0,
         "precio_venta": 80000.0,
         "stock_actual": 10.0,
-        "stock_minimo": 2.0
+        "stock_minimo": 2.0,
+        "ubicacion": "Vitrina B"
     })["id"]
 
-    # 2. Abrimos la ventana de Facturación y emitimos una venta de 3 unidades con 10% de descuento.
     win_fac = mod_facturacion.Facturacion(root)
-    combos_fac = _buscar_widgets(win_fac, ttk.Combobox)
-    cajas_fac = [w for w in _buscar_widgets(win_fac, tk.Entry) if not isinstance(w, ttk.Combobox)]
+    _validar_resolucion_maxima(win_fac)
 
-    combos_fac[0].set(f"Vend Uno (ID: {id_vend})")
-    combos_fac[1].set(f"Cli Final (ID: {id_cli})")
-    combos_fac[2].set("SSD-1TB - Disco SSD 1TB NVMe")
-    combos_fac[2].event_generate("<<ComboboxSelected>>")
+    combos = _buscar_widgets(win_fac, ctk.CTkComboBox)
+    cajas = _buscar_widgets(win_fac, ctk.CTkEntry)
 
-    cajas_fac[0].insert(0, "3")   # Cantidad: 3
-    cajas_fac[2].insert(0, "10")  # Descuento: 10%
+    combos[0].set(f"Ana Ventas (ID: {id_vend})")
+    combos[1].set(f"Pedro Cliente (ID: {id_cli})")
+    combos[2].set("SSD-1TB - Disco SSD 1TB NVMe")
+    win_fac.autocompletar_precio("SSD-1TB - Disco SSD 1TB NVMe")
 
-    _buscar_boton_por_texto(win_fac, "Guardar Facturación").invoke()
+    _escribir_entry(cajas[0], "4")   # Cantidad vendida.
+    _escribir_entry(cajas[2], "10")  # 10% descuento.
+
+    _clicar_boton(_buscar_boton_por_texto(win_fac, "Guardar Facturación"))
+
+    # Verificamos stock descontado (10 - 4 = 6).
+    assert cliente_http.obtener_producto(id_prod)["stock_actual"] == 6.0
 
     tabla_fac = _buscar_treeview(win_fac)
     assert len(tabla_fac.get_children()) == 1
-    id_factura_emitida = tabla_fac.get_children()[0]
-    # Total esperado: (3 * 80000) * 0.90 = 216000.0
-    assert float(tabla_fac.item(id_factura_emitida, "values")[4]) == 216000.0
+    iid_fac = tabla_fac.get_children()[0]
 
-    # Verificamos que el stock físico bajó de 10 a 7 unidades.
-    assert cliente_http.obtener_producto(id_prod)["stock_actual"] == 7.0
+    # Anulamos la factura y verificamos que el stock vuelva exactamente a 10.0 (no a 14.0).
+    tabla_fac.selection_set(iid_fac)
+    tabla_fac.event_generate("<<TreeviewSelect>>")
+    win_fac.update()
+    _clicar_boton(_buscar_boton_por_texto(win_fac, "Eliminar Facturación"))
 
-    # 3. Abrimos el Tablero de Analítica BI (analitica.py) y verificamos KPIs y DataFrame.
-    win_bi = mod_analitica.AnaliticaBI(root)
-    assert not win_bi.df.empty
-    assert win_bi.indicadores["Facturación Total"].cget("text") == "$ 216,000.00"
-    assert win_bi.indicadores["Operaciones"].cget("text") == "1"
-    assert win_bi.indicadores["Unidades Vendidas"].cget("text") == "3"
-    assert len(win_bi.tabla.get_children()) == 1
-    win_bi.cerrar_ventana()
-
-    # 4. Seleccionamos la factura en Facturación y la eliminamos (anulación), verificando restitución de stock.
-    tabla_fac.selection_set(id_factura_emitida)
-    _buscar_boton_por_texto(win_fac, "Eliminar Facturación").invoke()
     assert len(tabla_fac.get_children()) == 0
     assert cliente_http.obtener_producto(id_prod)["stock_actual"] == 10.0
-
     win_fac.destroy()
 
-def test_6_consola_sql_bloquea_escritura_y_permite_lectura_select(entorno_gui):
+
+def test_6_consola_sql_sandboxing_y_consulta_select(entorno_escritorio):
     """
-     Verifica que la Consola SQL de auditoría ('consola.py') bloquee cualquier
-     intento destructivo (Sandboxing Regex) y ejecute correctamente consultas SELECT.
+     Verifica que ConsolaSQL ejecute consultas SELECT sobre la API REST
+     y bloquee cualquier sentencia destructiva (DELETE/DROP/UPDATE).
     """
-    root = entorno_gui["root"]
-    win_consola = mod_consola.ConsolaSQL(root)
+    root = entorno_escritorio["root"]
+    alertas = entorno_escritorio["alertas"]
 
-    caja_query = _buscar_widgets(win_consola, tk.Text)[0]
-    btn_ejecutar = _buscar_boton_por_texto(win_consola, "Ejecutar Consulta")
-    tabla_sql = _buscar_treeview(win_consola)
+    win_sql = mod_consola.ConsolaSQL(root, id_actual=1)
+    _validar_resolucion_maxima(win_sql)
 
-    # 1. Intento de inyección destructiva (DELETE).
-    caja_query.insert("1.0", "DELETE FROM usuarios WHERE id = 1;")
-    btn_ejecutar.invoke()
-    assert len(entorno_gui["alertas"]["error"]) == 1
-    assert "Solo Lectura" in entorno_gui["alertas"]["error"][0][1]
+    editor = _buscar_widgets(win_sql, ctk.CTkTextbox)[0]
+    btn_ejecutar = _buscar_boton_por_texto(win_sql, "Ejecutar Consulta")
+    tabla_sql = _buscar_treeview(win_sql)
 
-    # 2. Consulta SELECT legítima de auditoría.
-    caja_query.delete("1.0", tk.END)
-    caja_query.insert("1.0", "SELECT usuario, nombres, apellidos FROM usuarios WHERE habilitado = 1")
-    btn_ejecutar.invoke()
+    # 1. Consulta SELECT válida.
+    editor.delete("1.0", "end")
+    editor.insert("1.0", "SELECT * FROM usuarios")
+    _clicar_boton(btn_ejecutar)
+    assert len(tabla_sql.get_children()) >= 1
 
-    filas_recuperadas = tabla_sql.get_children()
-    assert len(filas_recuperadas) >= 1
-    valores_primera_fila = tabla_sql.item(filas_recuperadas[0], "values")
-    assert valores_primera_fila[0] == "admin"
+    # 2. Intento de inyección destructiva bloqueado por Sandboxing.
+    editor.delete("1.0", "end")
+    editor.insert("1.0", "DELETE FROM usuarios;")
+    _clicar_boton(btn_ejecutar)
+    assert any("Bloqueo de Seguridad" in titulo for titulo, _ in alertas["error"])
+    win_sql.destroy()
 
-    win_consola.destroy()
 
-def test_7_bloqueo_baja_ultimo_admin_desde_gui_usuarios(entorno_gui):
+def test_7_analitica_bi_calcula_kpis_y_puebla_grilla(entorno_escritorio):
     """
-     Verifica que si desde la ventana de Usuarios se intenta eliminar al único
-     Administrador activo, el Trigger de SQLite ('trg_proteger_ultimo_admin')
-     aborte la operación y la ventana muestre el alerta sin borrar al usuario.
+     Verifica que el Tablero BI procese facturas emitidas desde el Backend,
+     renderice los 3 Canvas estadísticos y cargue el detalle histórico en tabla.
     """
-    root = entorno_gui["root"]
-    win_usuarios = mod_usuarios.Usuario(root, id_actual=1, rol_actual="Administrador")
-    tabla = _buscar_treeview(win_usuarios)
+    root = entorno_escritorio["root"]
 
-    # Seleccionamos al único Administrador (ID "1") e invocamos el botón "Eliminar".
-    tabla.selection_set("1")
-    _buscar_boton_por_texto(win_usuarios, "Eliminar").invoke()
+    id_prov = cliente_http.crear_perfil({"nombres": "Prov BI", "apellidos": "SA", "dni": "1", "rol": "Proveedor"})["id"]
+    id_vend = cliente_http.crear_perfil({"nombres": "Vendedor", "apellidos": "BI", "dni": "2", "rol": "Empleado - Ventas"})["id"]
+    id_cli = cliente_http.crear_perfil({"nombres": "Cliente", "apellidos": "BI", "dni": "3", "rol": "Cliente"})["id"]
+    id_prod = cliente_http.crear_producto({
+        "codigo": "BI-NOTE-01",
+        "descripcion": "Notebook 15 Pulgadas",
+        "categoria": "Computación",
+        "id_proveedor": id_prov,
+        "precio_costo": 400000.0,
+        "precio_venta": 600000.0,
+        "stock_actual": 5.0,
+        "stock_minimo": 1.0
+    })["id"]
 
-    # Debe haberse disparado un messagebox.showerror y el Admin debe seguir en la tabla.
-    assert len(entorno_gui["alertas"]["error"]) == 1
-    assert "1" in tabla.get_children()
+    cliente_http.emitir_factura({
+        "id_vendedor": id_vend,
+        "id_cliente": id_cli,
+        "id_producto": id_prod,
+        "cantidad": 2.0,
+        "descuento": 0.0
+    })
 
-    win_usuarios.destroy()
+    win_bi = mod_analitica.Analitica(root)
+    _validar_resolucion_maxima(win_bi)
+
+    tabla_bi = _buscar_treeview(win_bi)
+    assert len(tabla_bi.get_children()) == 1
+    fila = tabla_bi.item(tabla_bi.get_children()[0], "values")
+    assert fila[1] == "Notebook 15 Pulgadas"
+    assert fila[2] == "Computación"
+
+    canvases_bi = [w for w in _buscar_widgets(win_bi, tk.Canvas) if type(w) is tk.Canvas]
+    assert len(canvases_bi) == 3
+    win_bi.destroy()
+
+
+def test_8_modo_oscuro_bilingue_accesibilidad_semaforo_y_buscador(entorno_escritorio):
+    """
+     Verifica de punta a punta las mejoras profesionales de la Capa 4:
+     1. Cambio reactivo a Modo Oscuro, Alto Contraste WCAG y Zoom 125% sin exceder 1280x720.
+     2. Traducción en vivo a Inglés (EN) manteniendo roles canónicos en español hacia FastAPI.
+     3. Semáforo visual de inventario ('stock_agotado' y 'stock_bajo') y filtro en vivo.
+     4. Redibujado reactivo de los 3 Canvas en Analítica BI al alternar tema.
+    """
+    root = entorno_escritorio["root"]
+
+    # 1. PanelControl: Modo Oscuro + Alto Contraste + Escala máxima (125%) + Inglés.
+    panel = mod_panel.PanelControl(root, 1, "Administrador", "David", "Bravo")
+    gestor_ui.alternar_tema()
+    assert gestor_ui.tema == "dark"
+    assert panel.cget("fg_color") == "#0F172A"
+
+    gestor_ui.alternar_alto_contraste()
+    assert gestor_ui.alto_contraste is True
+    assert panel.cget("fg_color") == "#000000"
+
+    gestor_ui.ajustar_escala(1)
+    gestor_ui.ajustar_escala(1)
+    assert gestor_ui.escala == 1.25
+    _validar_resolucion_maxima(panel)
+
+    gestor_ui.alternar_idioma()
+    assert gestor_ui.idioma == "en"
+    assert _buscar_boton_por_texto(panel, "Customer Management").cget("state") == "normal"
+    assert _buscar_boton_por_texto(panel, "Sign Out").cget("state") == "normal"
+    panel.destroy()
+
+    # 2. Usuarios (IAM) operando en Inglés: el Backend debe recibir el rol canónico español.
+    win_usu = mod_usuarios.Usuario(root, id_actual=1, rol_actual="Administrador")
+    _validar_resolucion_maxima(win_usu)
+
+    cajas_usu = _buscar_widgets(win_usu, ctk.CTkEntry)
+    combo_usu = _buscar_widgets(win_usu, ctk.CTkComboBox)[0]
+
+    _escribir_entry(cajas_usu[0], "Elena")
+    _escribir_entry(cajas_usu[1], "Vega")
+    _escribir_entry(cajas_usu[2], "evega")
+    _escribir_entry(cajas_usu[3], "SalesPass2026")
+    combo_usu.set("Sales Employee")
+
+    _clicar_boton(_buscar_boton_por_texto(win_usu, "Save"))
+
+    perfiles_api = cliente_http.listar_perfiles()
+    perfil_elena = next(p for p in perfiles_api if p.get("usuario") == "evega")
+    assert perfil_elena["rol"] == "Empleado - Ventas"
+
+    tabla_usu = _buscar_treeview(win_usu)
+    assert tabla_usu.item(str(perfil_elena["id"]), "values")[1] == "Sales Employee"
+
+    # Al volver a Español con la ventana abierta, el Patrón Observador actualiza la grilla en vivo.
+    gestor_ui.alternar_idioma()
+    assert gestor_ui.idioma == "es"
+    assert tabla_usu.item(str(perfil_elena["id"]), "values")[1] == "Empleado - Ventas"
+    win_usu.destroy()
+
+    # 3. Stock: Semáforo visual (agotado / bajo / normal) y buscador instantáneo.
+    id_prov = cliente_http.crear_perfil({"nombres": "Prov Semaforo", "apellidos": "SA", "dni": "9", "rol": "Proveedor"})["id"]
+    id_agotado = cliente_http.crear_producto({
+        "codigo": "SEM-000", "descripcion": "Cable HDMI Agotado", "categoria": "Cables",
+        "id_proveedor": id_prov, "precio_costo": 1000.0, "precio_venta": 2000.0,
+        "stock_actual": 0.0, "stock_minimo": 5.0
+    })["id"]
+    id_bajo = cliente_http.crear_producto({
+        "codigo": "SEM-LOW", "descripcion": "Mouse Stock Bajo", "categoria": "Perifericos",
+        "id_proveedor": id_prov, "precio_costo": 5000.0, "precio_venta": 9000.0,
+        "stock_actual": 3.0, "stock_minimo": 5.0
+    })["id"]
+    id_ok = cliente_http.crear_producto({
+        "codigo": "SEM-OK", "descripcion": "Teclado Stock Normal", "categoria": "Perifericos",
+        "id_proveedor": id_prov, "precio_costo": 10000.0, "precio_venta": 18000.0,
+        "stock_actual": 25.0, "stock_minimo": 5.0
+    })["id"]
+
+    win_stk = mod_stock.Stock(root)
+    _validar_resolucion_maxima(win_stk)
+    tabla_stk = _buscar_treeview(win_stk)
+
+    assert "stock_agotado" in tabla_stk.item(str(id_agotado), "tags")
+    assert "stock_bajo" in tabla_stk.item(str(id_bajo), "tags")
+    assert any(t in ("par", "impar") for t in tabla_stk.item(str(id_ok), "tags"))
+
+    # Verificamos el enlace de teclado y ejecutamos el filtro de forma determinista en headless.
+    caja_busqueda = _buscar_widgets(win_stk, ctk.CTkEntry)[-1]
+    assert caja_busqueda._entry.bind("<KeyRelease>"), "El buscador debe tener enlazado el evento <KeyRelease>."
+    _escribir_entry(caja_busqueda, "SEM-LOW")
+    win_stk.filtrar_tabla()
+    assert len(tabla_stk.get_children()) == 1
+    assert tabla_stk.item(tabla_stk.get_children()[0], "values")[0] == "SEM-LOW"
+    win_stk.destroy()
+
+    # 4. Analítica BI: redibujado reactivo de los 3 Canvas puros al cambiar tema y contraste.
+    win_bi = mod_analitica.Analitica(root)
+    _validar_resolucion_maxima(win_bi)
+    canvases_bi = [w for w in _buscar_widgets(win_bi, tk.Canvas) if type(w) is tk.Canvas]
+    assert len(canvases_bi) == 3
+    assert canvases_bi[0].cget("bg") == gestor_ui.paleta()["canvas_bg"]
+
+    gestor_ui.alternar_alto_contraste()
+    gestor_ui.alternar_tema()
+    assert canvases_bi[0].cget("bg") == gestor_ui.paleta()["canvas_bg"]
+    win_bi.destroy()

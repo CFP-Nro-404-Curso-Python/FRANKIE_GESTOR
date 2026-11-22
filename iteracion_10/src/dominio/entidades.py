@@ -2,7 +2,7 @@
 #  ENTIDADES DE DOMINIO (CAPA 1 - NÚCLEO DE NEGOCIO)
 # ========================================================================================
 #  DECISIÓN DE DISEÑO (KISS / YAGNI / DIP):
-
+#
 #   Usamos 'dataclasses' nativas de Python para evitar el código repetitivo (boilerplate) 
 #   de los constructores __init__. Estas clases son Puras (POJOs/POCOs): no saben 
 #   absolutamente nada de bases de datos, diccionarios JSON, ni validaciones web.
@@ -10,24 +10,32 @@
 #   Su único propósito es modelar los conceptos del negocio en la memoria RAM.
 # ========================================================================================
 
-
-
 from dataclasses import dataclass
 from typing import Optional
+
 
 @dataclass
 class PerfilUsuario:
     """
      Entidad polimórfica que representa a cualquier actor del sistema.
-     Abstrae a Administradores, Gerentes, Empleados, Clientes y Proveedores.
+     Abstrae a Administradores, Gerentes, Empleados, Clientes y Proveedores,
+     integrando tanto sus credenciales de acceso (Usuarios) como su legajo 
+     de contacto y localización (RRHH, Clientes y Proveedores).
     """
     nombres: str
     apellidos: str
     dni: str
     rol: str
-    # Opcionales porque un Cliente o Proveedor se crea sin credenciales de acceso.
+    # Opcionales porque un Cliente, Proveedor o alta inicial en RRHH puede crearse sin login.
     usuario: Optional[str] = None
     password_hash: Optional[str] = None
+    # Atributos de legajo personal, contacto y domicilio (3FN) con valor por defecto "S/D".
+    telefono: str = "S/D"
+    email: str = "S/D"
+    direccion: str = "S/D"
+    ciudad: str = "S/D"
+    provincia: str = "S/D"
+    cp: str = "S/D"
     # El ID es opcional al instanciar porque un usuario nuevo aún no fue persistido.
     id: Optional[int] = None
     habilitado: int = 1
@@ -37,7 +45,7 @@ class PerfilUsuario:
 class Producto:
     """
      Entidad que representa un artículo en el inventario.
-     Contiene la lógica base comercial (precios y stock).
+     Contiene la lógica base comercial (precios, stock y ubicación física).
     """
     codigo: str
     descripcion: str
@@ -47,6 +55,7 @@ class Producto:
     precio_venta: float
     stock_actual: float
     stock_minimo: float = 0.0
+    ubicacion: str = "S/D"
     vencimiento: str = "S/D"
     id: Optional[int] = None
     habilitado: int = 1

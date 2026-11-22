@@ -4,20 +4,29 @@ from src.dominio.entidades import Producto
 from src.dominio.puertos import PuertoRepositorioProductos
 from src.infraestructura.persistencia.utilidades_sql import obtener_o_crear
 
+
+
 # ============================================================================
 #  REPOSITORIO DE PRODUCTOS SQL (CAPA 3 - INFRAESTRUCTURA)
 # ============================================================================
 #  DECISIÓN DE DISEÑO (KISS Y 3FN):
 #
 #   Encapsula las sentencias SQL de inventario. Traduce nuestra entidad pura 
-#   'Producto' a las tablas relacionales. Aplica el borrado lógico y gestiona 
-#   atómicamente el incremento/decremento de stock para evitar condiciones de 
-#   carrera.
+#   'Producto' a las tablas relacionales ('productos', 'estados', 
+#   'productoxestados', 'ubicaciones_stock' y 'productoxubicaciones').
 # ============================================================================
 
-
-
 class RepositorioProductosSQL(PuertoRepositorioProductos):
+
+    _SELECT_PRODUCTO_3FN = '''
+        SELECT p.id, p.codigo, p.descripcion, p.categoria, p.id_proveedor, 
+               p.precio_costo, p.precio_venta, p.stock_actual, p.stock_minimo, 
+               p.vencimiento, p.habilitado,
+               COALESCE(ub.ubicacion, 'S/D') AS ubicacion
+        FROM productos p
+        LEFT JOIN productoxubicaciones pxu ON p.id = pxu.id_producto AND pxu.habilitado = 1
+        LEFT JOIN ubicaciones_stock ub ON pxu.id_ubicacion = ub.id
+    '''
     
     def __init__(self, conexion: sqlite3.Connection):
         """
@@ -25,10 +34,29 @@ class RepositorioProductosSQL(PuertoRepositorioProductos):
         """
         self.conexion = conexion
 
+    def _obtener_o_crear_ubicacion(self, cursor: sqlite3.Cursor, ubicacion: str) -> int:
+        """Busca o inserta la ubicación de depósito preservando su formato legible."""
+        valor_limpio = str(ubicacion).strip() if ubicacion and str(ubicacion).strip() else "S/D"
+        cursor.execute("SELECT id FROM ubicaciones_stock WHERE ubicacion = ?", (valor_limpio,))
+        fila = cursor.fetchone()
+        if fila:
+            return fila[0]
+        cursor.execute("INSERT INTO ubicaciones_stock (ubicacion, habilitado) VALUES (?, 1)", (valor_limpio,))
+        return cursor.lastrowid
+
+    def _sincronizar_ubicacion_stock(self, cursor: sqlite3.Cursor, id_producto: int, ubicacion: str) -> None:
+        """Actualiza el vínculo 3FN entre el producto y su ubicación física en depósito."""
+        cursor.execute("UPDATE productoxubicaciones SET habilitado = 0 WHERE id_producto = ?", (id_producto,))
+        id_ubicacion = self._obtener_o_crear_ubicacion(cursor, ubicacion)
+        cursor.execute(
+            "INSERT INTO productoxubicaciones (id_producto, id_ubicacion, habilitado) VALUES (?, ?, 1)",
+            (id_producto, id_ubicacion)
+        )
+
     def guardar(self, producto: Producto) -> int:
         """
-         Inserta un nuevo producto en el catálogo e inicializa su estado 
-         como 'Disponible' en la tabla puente.
+         Inserta un nuevo producto en el catálogo, inicializa su estado como 
+         'Disponible' y vincula su ubicación física en las tablas puente 3FN.
         """
         cursor = self.conexion.cursor()
         
@@ -51,15 +79,18 @@ class RepositorioProductosSQL(PuertoRepositorioProductos):
         
         # 3. Vinculamos producto y estado en la tabla puente.
         cursor.execute('''
-            INSERT INTO productoxestados (id_producto, id_estado)
-            VALUES (?, ?)
+            INSERT INTO productoxestados (id_producto, id_estado, habilitado)
+            VALUES (?, ?, 1)
         ''', (id_nuevo_producto, id_estado))
+
+        # 4. Vinculamos producto y ubicación física en depósito.
+        self._sincronizar_ubicacion_stock(cursor, id_nuevo_producto, producto.ubicacion)
         
         return id_nuevo_producto
 
     def modificar(self, producto: Producto) -> None:
         """
-         Actualiza los valores comerciales y descriptivos de un producto existente.
+         Actualiza los valores comerciales, descriptivos y de ubicación de un producto existente.
         """
         cursor = self.conexion.cursor()
         cursor.execute('''
@@ -74,6 +105,7 @@ class RepositorioProductosSQL(PuertoRepositorioProductos):
             producto.stock_actual, producto.stock_minimo, producto.vencimiento, 
             producto.id
         ))
+        self._sincronizar_ubicacion_stock(cursor, producto.id, producto.ubicacion)
 
     def eliminar(self, id_producto: int) -> None:
         """
@@ -89,14 +121,10 @@ class RepositorioProductosSQL(PuertoRepositorioProductos):
          Solo retorna productos activos.
         """
         cursor = self.conexion.cursor()
-        cursor.execute('''
-            SELECT id, codigo, descripcion, categoria, id_proveedor, 
-                   precio_costo, precio_venta, stock_actual, stock_minimo, 
-                   vencimiento, habilitado
-            FROM productos
-            WHERE codigo = ? AND habilitado = 1
-        ''', (codigo,))
-        
+        cursor.execute(
+            f"{self._SELECT_PRODUCTO_3FN} WHERE p.codigo = ? AND p.habilitado = 1 GROUP BY p.id",
+            (codigo,)
+        )
         fila = cursor.fetchone()
         return self._mapear_a_entidad(fila) if fila else None
 
@@ -105,49 +133,24 @@ class RepositorioProductosSQL(PuertoRepositorioProductos):
          Busca un producto directamente por su clave primaria (PK) física.
         """
         cursor = self.conexion.cursor()
-        cursor.execute('''
-            SELECT id, codigo, descripcion, categoria, id_proveedor, 
-                   precio_costo, precio_venta, stock_actual, stock_minimo, 
-                   vencimiento, habilitado
-            FROM productos
-            WHERE id = ? AND habilitado = 1
-        ''', (id_producto,))
-        
+        cursor.execute(
+            f"{self._SELECT_PRODUCTO_3FN} WHERE p.id = ? AND p.habilitado = 1 GROUP BY p.id",
+            (id_producto,)
+        )
         fila = cursor.fetchone()
         return self._mapear_a_entidad(fila) if fila else None
 
-
-    # -----------------------------------------------------------------------------
-    # CAMBIO APLICADO:
-    #  
-    # Se implementó el método 'listar_todos' exigido por el puerto actualizado.
-    #
-    # Obtiene todos los productos activos (habilitado = 1) para poblar las grillas 
-    # de catálogo e inventario en las vistas de Escritorio y Web.
-    # -----------------------------------------------------------------------------
-    
     def listar_todos(self) -> List[Producto]:
         """
          Devuelve la lista completa de todos los productos activos en el catálogo.
         """
         cursor = self.conexion.cursor()
-        cursor.execute('''
-            SELECT id, codigo, descripcion, categoria, id_proveedor, 
-                   precio_costo, precio_venta, stock_actual, stock_minimo, 
-                   vencimiento, habilitado
-            FROM productos
-            WHERE habilitado = 1
-        ''')
-        
+        cursor.execute(f"{self._SELECT_PRODUCTO_3FN} WHERE p.habilitado = 1 GROUP BY p.id")
         return [self._mapear_a_entidad(fila) for fila in cursor.fetchall()]
 
     def actualizar_stock(self, id_producto: int, variacion: float) -> None:
         """
          Suma o resta cantidades al stock físico directamente en el motor SQL.
-        
-         NOTA DE DISEÑO: Delegar esta matemática a SQLite (stock_actual = stock_actual + variacion)
-         previene las Condiciones de Carrera (Race Conditions) que ocurrirían si dos 
-         usuarios facturan exactamente al mismo tiempo y sobreescriben la lectura del otro.
         """
         cursor = self.conexion.cursor()
         cursor.execute('''
@@ -172,5 +175,6 @@ class RepositorioProductosSQL(PuertoRepositorioProductos):
             stock_actual=fila[7],
             stock_minimo=fila[8],
             vencimiento=fila[9],
-            habilitado=fila[10]
+            habilitado=fila[10],
+            ubicacion=fila[11] if len(fila) > 11 and fila[11] else "S/D"
         )

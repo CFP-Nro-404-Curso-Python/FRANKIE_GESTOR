@@ -59,18 +59,18 @@ El desarrollo del sistema se ejecuta de adentro hacia afuera (*Inside-Out*), esc
 * **Criterio de Aceptación TDD:** Pruebas automatizadas con `TestClient` simulando peticiones de clientes externos y regresiones completas tras cada auditoría del contrato (lecturas generales `GET`, normalización de roles, persistencia 3FN de contactos/domicilios/ubicaciones de stock y restitución atómica de inventario al anular facturas). Al cerrar el ciclo de validación, **el Backend queda sellado como única fuente de verdad para todas las vistas**.
 
 
-## Etapa 4: Adaptadores de Presentación (CustomTkinter + Web LAN), Accesibilidad/i18n y Tests E2E (TDD Ciclo 4)
+## Etapa 4: Adaptadores de Presentación (CustomTkinter + Web LAN), Accesibilidad/i18n, Impresión/PDF y Tests E2E (TDD Ciclo 4)
 
-* **Objetivo:** Conectar dos interfaces de usuario independientes con paridad 1:1 bajo un *Design System* **Slate/Blue** unificado (cliente de escritorio en CustomTkinter con ventanas `<= 1280x720` y SPA web responsive para PC y móviles en red local), consumiendo exactamente los mismos endpoints de la API REST, sin cachés locales de datos maestros ni acoplamiento con SQLite o Bcrypt. Incorporar soporte reactivo de **Modo Claro/Oscuro**, **Alto Contraste WCAG**, **Zoom Tipográfico**, **Internacionalización ES/EN**, buscadores en vivo, semáforo de stock y scripts de ejecución operativa.
+* **Objetivo:** Conectar dos interfaces de usuario independientes con paridad 1:1 bajo un *Design System* **Slate/Blue** unificado (cliente de escritorio en CustomTkinter con ventanas `<= 1280x720` y SPA web responsive para PC y móviles en red local), consumiendo exactamente los mismos endpoints de la API REST, sin cachés locales de datos maestros ni acoplamiento con SQLite o Bcrypt. Incorporar soporte reactivo de **Modo Claro/Oscuro**, **Alto Contraste WCAG**, **Zoom Tipográfico**, **Internacionalización ES/EN**, buscadores en vivo, semáforo de stock, **vista previa e impresión/PDF dual de facturas** (100% en Capa 4) y scripts de ejecución operativa.
 
 * **Archivos a construir:**
 
   * **Cliente Escritorio:** `src/presentacion/escritorio/cliente_api.py` (`ClienteAPI` + `GestorUI` bajo Patrón Observador) y las 10 vistas migradas a CustomTkinter en `src/presentacion/escritorio/vistas/` (`login.py`, `panel_control.py`, `usuarios.py`, `empleados.py`, `clientes.py`, `proveedores.py`, `stock.py`, `facturacion.py`, `consola.py`, `analitica.py`).
-  * **Cliente Web Responsive (LAN):** `src/presentacion/web/index.html`, `src/presentacion/web/estilos.css` y `src/presentacion/web/app_web.js` (preferencias visuales únicamente en `sessionStorage`, cero `localStorage`).
+  * **Cliente Web Responsive (LAN):** `src/presentacion/web/index.html`, `src/presentacion/web/estilos.css` (con `@media print`) y `src/presentacion/web/app_web.js` (preferencias visuales únicamente en `sessionStorage`, cero `localStorage`).
   * **Scripts Lanzadores (Windows):** `iniciar_frankie_gestor.bat` (ejecución operativa) e `iniciar_con_semillas.bat` (ciclo efímero de pruebas con semillas BI y limpieza automática).
-  * **Suite de Pruebas E2E:** `tests/integracion/test_vistas_escritorio.py` (8 casos en CustomTkinter *headless*, incluyendo temas, WCAG, i18n con roles canónicos, semáforo y filtro) y `tests/integracion/test_sincronizacion_web_escritorio.py` (7 casos de auditoría SPA, paridad WCAG/i18n, CORS LAN, ausencia de `localStorage` y sincronización bidireccional 3FN).
+  * **Suite de Pruebas E2E:** `tests/integracion/test_vistas_escritorio.py` (9 casos en CustomTkinter *headless*, incluyendo temas, WCAG, i18n con roles canónicos, semáforo, filtro y vista previa/exportación HTML-PDF de facturas) y `tests/integracion/test_sincronizacion_web_escritorio.py` (8 casos de auditoría SPA, paridad WCAG/i18n/`@media print`, CORS LAN, ausencia de `localStorage` y sincronización bidireccional 3FN).
 
-* **Criterio de Aceptación:** Ejecución en verde de la suite completa (**35 tests**) y sincronización real entre plataformas: cualquier registro o modificación de legajo personal, contacto, domicilio, ubicación de stock o comprobante ejecutado desde la Web (PC o móvil) se persiste en SQLite y se refleja instantáneamente en CustomTkinter y viceversa, manteniendo los roles canónicos intactos al operar en español o inglés.
+* **Criterio de Aceptación:** Ejecución en verde de la suite completa (**37 tests**) y sincronización real entre plataformas: cualquier registro o modificación de legajo personal, contacto, domicilio, ubicación de stock o comprobante ejecutado desde la Web (PC o móvil) se persiste en SQLite y se refleja instantáneamente en CustomTkinter y viceversa, manteniendo los roles canónicos intactos al operar en español o inglés y permitiendo imprimir o exportar a PDF comprobantes legibles desde ambos clientes.
 
 
 ## Etapa 5: Documentación de Ingeniería y Modelado Visual (`docs/` y `diagramas/`)
@@ -79,7 +79,7 @@ El desarrollo del sistema se ejecuta de adentro hacia afuera (*Inside-Out*), esc
 
 * **Archivos a construir:**
 
-  * `README.md` y `README_esp.md` (presentación ejecutiva bilingüe, instalación y operación con lanzadores `.bat`).
+  * `README.md` (presentación ejecutiva integradora de las iteraciones 0 a 10, instalación y operación con lanzadores `.bat`).
   * `docs/descripcion.md` (entregable técnico integrador con referencias a los 9 diagramas).
   * `docs/fundamentos/diseño_arquitectonico.md` y `docs/fundamentos/plan_construccion_guiado_TDD.md`.
   * `docs/reportes/etapa_1.md`, `etapa_2.md`, `etapa_3.md` y `etapa_4.md`.

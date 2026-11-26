@@ -1,6 +1,6 @@
-/* ==============================================================================
+/* ==================================================================================
     HOJA DE ESTILOS RESPONSIVE (CAPA 4 - PRESENTACIÓN WEB)
-   ==============================================================================
+   ==================================================================================
     DECISIÓN DE DISEÑO (PARIDAD 1:1 CON CUSTOMTKINTER, TEMAS Y ACCESIBILIDAD):
 
     - Unifica el Design System Slate/Blue de las vistas de Escritorio
@@ -9,8 +9,8 @@
 
     - Implementa los 4 perfiles visuales exactos de GestorUI:
       Claro, Oscuro, Claro Alto Contraste y Oscuro Alto Contraste (WCAG AAA),
-      junto con escalado tipográfico fluido (100% / 115% / 125%).
-   ============================================================================== */
+      escalado tipográfico fluido (100% / 115% / 125%) y salida limpia @media print.
+   ================================================================================== */
 
 :root {
     --bg-principal: #F1F5F9;
@@ -50,7 +50,7 @@
     --color-gris: #64748B;
     --color-gris-hover: #475569;
 
-    /* Tablas, estados deshabilitados y semáforo de inventario */
+    /* Tablas, estados deshabilitados y semáforo de inventario. */
     --tabla-head-bg: #E2E8F0;
     --tabla-head-fg: #1E293B;
     --tabla-zebra: #F8FAFC;
@@ -75,7 +75,7 @@
     --radio-borde: 12px;
 }
 
-/* Perfil 2: Modo Oscuro */
+/* Perfil 2: Modo Oscuro. */
 html[data-theme="dark"] {
     --bg-principal: #0F172A;
     --bg-tarjeta: #1E293B;
@@ -110,7 +110,7 @@ html[data-theme="dark"] {
     --sombra-tarjeta: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
-/* Perfil 3: Claro + Alto Contraste (WCAG AAA) */
+/* Perfil 3: Claro + Alto Contraste (WCAG AAA). */
 html[data-contrast="high"] {
     --bg-principal: #FFFFFF;
     --bg-tarjeta: #FFFFFF;
@@ -145,7 +145,7 @@ html[data-contrast="high"] {
     --texto-consola: #FFFFFF;
 }
 
-/* Perfil 4: Oscuro + Alto Contraste (WCAG AAA) */
+/* Perfil 4: Oscuro + Alto Contraste (WCAG AAA). */
 html[data-theme="dark"][data-contrast="high"] {
     --bg-principal: #000000;
     --bg-tarjeta: #0A0A0A;
@@ -180,7 +180,7 @@ html[data-theme="dark"][data-contrast="high"] {
     --texto-consola: #FACC15;
 }
 
-/* Escalado tipográfico controlado (Accesibilidad A- / A+) */
+/* Escalado tipográfico controlado (Accesibilidad A- / A+). */
 html { font-size: 16px; }
 html[data-scale="1.15"] { font-size: 18px; }
 html[data-scale="1.25"] { font-size: 19.5px; }
@@ -205,7 +205,7 @@ body {
     display: none !important;
 }
 
-/* Anillo de foco accesible para navegación por teclado (WCAG 2.1 AA) */
+/* Anillo de foco accesible para navegación por teclado (WCAG 2.1 AA). */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -215,8 +215,9 @@ textarea:focus-visible {
 }
 
 
+
 /* ===================================================
-   1. BARRA SUPERIOR DE NAVEGACIÓN Y PREFERENCIAS UI
+    1. BARRA SUPERIOR DE NAVEGACIÓN Y PREFERENCIAS UI
    =================================================== */
 
 .barra-superior {
@@ -309,9 +310,10 @@ textarea:focus-visible {
 }
 
 
-/* =========================================
-   2. CONTENEDOR SPA Y TRANSICIÓN DE VISTAS
-   ========================================= */
+
+/* ==========================================
+    2. CONTENEDOR SPA Y TRANSICIÓN DE VISTAS
+   ========================================== */
 
 .contenedor-principal {
     max-width: 1240px;
@@ -340,9 +342,10 @@ textarea:focus-visible {
 }
 
 
-/* ==================
-   3. VISTA DE LOGIN
-   ================== */
+
+/* ===================
+    3. VISTA DE LOGIN
+   =================== */
 
 .tarjeta-login {
     background-color: var(--bg-tarjeta);
@@ -377,9 +380,10 @@ textarea:focus-visible {
 }
 
 
-/* ===============================================
-   4. SISTEMA DE BOTONES Y PALETA DE ROLES (RBAC)
-   =============================================== */
+
+/* ================================================
+    4. SISTEMA DE BOTONES Y PALETA DE ROLES (RBAC)
+   ================================================ */
 
 .btn,
 .btn-panel {
@@ -454,9 +458,10 @@ textarea:focus-visible {
 .btn-gris:hover:not(:disabled) { background-color: var(--color-gris-hover); }
 
 
-/* =====================================
-   5. PANEL DE CONTROL (MENÚ PRINCIPAL)
-   ===================================== */
+
+/* ======================================
+    5. PANEL DE CONTROL (MENÚ PRINCIPAL)
+   ====================================== */
 
 .cabecera-panel {
     text-align: center;
@@ -507,9 +512,10 @@ textarea:focus-visible {
 }
 
 
-/* ==========================================
-   6. FORMULARIOS ABM Y CONTROLES DE ENTRADA
-   ========================================== */
+
+/* ===========================================
+    6. FORMULARIOS ABM Y CONTROLES DE ENTRADA
+   =========================================== */
 
 .cabecera-modulo {
     display: flex;
@@ -567,7 +573,7 @@ textarea:focus-visible {
     color: var(--texto-label);
 }
 
-/* Fuente >= 1rem evita zoom automático en iOS y Android */
+/* Fuente >= 1rem evita zoom automático en iOS y Android. */
 .grupo-campo input,
 .grupo-campo select,
 .fila-descuento-global input,
@@ -601,9 +607,10 @@ textarea:focus-visible {
 }
 
 
-/* ========================================================================
-   7. TABLAS DE DATOS, BUSCADOR EN VIVO Y SEMÁFORO DE STOCK
-   ======================================================================== */
+
+/* ==========================================================
+    7. TABLAS DE DATOS, BUSCADOR EN VIVO Y SEMÁFORO DE STOCK
+   ========================================================== */
 
 .contenedor-tabla {
     background-color: var(--bg-tarjeta);
@@ -723,9 +730,10 @@ textarea:focus-visible {
 }
 
 
-/* =======================================================
-   8. SECCIÓN DE TOTALES Y DESCUENTO GLOBAL (FACTURACIÓN)
-   ======================================================= */
+
+/* ========================================================
+    8. SECCIÓN DE TOTALES Y DESCUENTO GLOBAL (FACTURACIÓN)
+   ======================================================== */
 
 .tarjeta-totales-factura {
     background-color: var(--bg-tarjeta);
@@ -772,9 +780,10 @@ textarea:focus-visible {
 }
 
 
-/* ===================================================
-   9. CONSOLA SQL DE AUDITORÍA (SANDBOX SOLO LECTURA)
-   =================================================== */
+
+/* ====================================================
+    9. CONSOLA SQL DE AUDITORÍA (SANDBOX SOLO LECTURA)
+   ==================================================== */
 
 .chips-sql {
     display: flex;
@@ -818,9 +827,10 @@ textarea:focus-visible {
 }
 
 
-/* ====================================================
-   10. TABLERO DE INTELIGENCIA DE NEGOCIOS (BI / OLAP)
-   ==================================================== */
+
+/* =====================================================
+    10. TABLERO DE INTELIGENCIA DE NEGOCIOS (BI / OLAP)
+   ===================================================== */
 
 .subtitulo-bi {
     font-size: 0.84rem;
@@ -893,9 +903,10 @@ textarea:focus-visible {
 }
 
 
-/* ===========================================================
-   11. MODAL DE ALERTAS (EQUIVALENTE A MESSAGEBOX DE TKINTER)
-   =========================================================== */
+
+/* ============================================================
+    11. MODAL DE ALERTAS (EQUIVALENTE A MESSAGEBOX DE TKINTER)
+   ============================================================ */
 
 .modal-fondo {
     position: fixed;
@@ -946,9 +957,212 @@ textarea:focus-visible {
 }
 
 
-/* ================================================================
-   12. MEDIA QUERIES PARA CELULARES Y PANTALLAS PEQUEÑAS (< 640px)
-   ================================================================ */
+
+/* ==========================================================================
+    12. MODAL DE VISTA PREVIA E IMPRESIÓN / PDF DE FACTURA (OPCIÓN B - DUAL)
+   ========================================================================== */
+
+.modal-impresion {
+    z-index: 950;
+}
+
+.modal-caja-impresion {
+    background-color: var(--bg-principal);
+    color: var(--texto-primario);
+    width: 100%;
+    max-width: 900px;
+    max-height: 92vh;
+    border-radius: var(--radio-borde);
+    border: var(--grosor-borde) solid var(--borde-suave);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.42);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-cabecera-impresion {
+    background-color: var(--color-header);
+    color: var(--color-header-texto);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.modal-cabecera-impresion h3 {
+    font-size: 0.98rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.acciones-impresion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.barra-modo-impresion {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 18px 0;
+}
+
+.contenedor-hoja-impresion {
+    padding: 16px 18px 18px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+
+.hoja-comprobante {
+    background-color: var(--bg-tarjeta);
+    color: var(--texto-primario);
+    border: var(--grosor-borde) solid var(--borde-suave);
+    border-radius: 10px;
+    padding: 22px 26px;
+}
+
+.comprobante-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    border-bottom: 2px solid var(--borde-suave);
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+}
+
+.comprobante-marca h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.comprobante-marca p {
+    font-size: 0.82rem;
+    color: var(--texto-secundario);
+    margin-top: 2px;
+}
+
+.comprobante-nro {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.comprobante-etq {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--texto-secundario);
+}
+
+.comprobante-nro strong {
+    font-size: 1.02rem;
+}
+
+.comprobante-fecha {
+    font-size: 0.8rem;
+    color: var(--texto-secundario);
+}
+
+.comprobante-meta {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 18px;
+    background-color: var(--tabla-zebra);
+    border: 1px solid var(--borde-fila);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 0.88rem;
+}
+
+.comprobante-tabla-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-bottom: 14px;
+}
+
+.tabla-comprobante {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 520px;
+    font-size: 0.88rem;
+}
+
+.tabla-comprobante thead th {
+    background-color: var(--tabla-head-bg);
+    color: var(--tabla-head-fg);
+    padding: 9px 10px;
+    text-align: left;
+    border-bottom: 2px solid var(--borde-suave);
+    white-space: nowrap;
+}
+
+.tabla-comprobante tbody td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--borde-fila);
+}
+
+.tabla-comprobante tbody tr:nth-child(even) {
+    background-color: var(--tabla-zebra);
+}
+
+.tabla-comprobante th.num,
+.tabla-comprobante td.num {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.comprobante-totales {
+    max-width: 340px;
+    margin-left: auto;
+    border-top: 2px solid var(--borde-suave);
+    padding-top: 10px;
+}
+
+.comprobante-tot-linea {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    font-size: 0.94rem;
+}
+
+.comprobante-tot-linea.desc {
+    color: var(--color-naranja);
+    font-weight: 700;
+}
+
+.comprobante-tot-linea.final {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-verde);
+    border-top: 1px solid var(--borde-suave);
+    margin-top: 6px;
+    padding-top: 8px;
+}
+
+.comprobante-pie {
+    margin-top: 18px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--borde-suave);
+    text-align: center;
+    font-size: 0.78rem;
+    font-style: italic;
+    color: var(--texto-secundario);
+}
+
+
+/* =================================================================
+    13. MEDIA QUERIES PARA CELULARES Y PANTALLAS PEQUEÑAS (< 640px)
+   ================================================================= */
 
 @media (max-width: 640px) {
     .contenedor-principal {
@@ -1013,5 +1227,141 @@ textarea:focus-visible {
     .fila-descuento-global .btn {
         max-width: 100%;
         width: 100%;
+    }
+
+    .hoja-comprobante {
+        padding: 14px;
+    }
+
+    .comprobante-cabecera {
+        flex-direction: column;
+    }
+
+    .comprobante-nro {
+        text-align: left;
+    }
+
+    .comprobante-meta {
+        grid-template-columns: 1fr;
+    }
+
+    .comprobante-totales {
+        max-width: 100%;
+    }
+}
+
+
+
+/* ==========================================================
+    14. REGLAS DE IMPRESIÓN Y EXPORTACIÓN PDF (@media print)
+   ========================================================== */
+
+@page {
+    margin: 12mm;
+}
+
+@media print {
+    html,
+    body {
+        background: #FFFFFF !important;
+        color: #0F172A !important;
+        font-size: 13px !important;
+        min-height: auto !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+
+    #modal-impresion-factura {
+        position: static !important;
+        inset: auto !important;
+        display: block !important;
+        background: transparent !important;
+        padding: 0 !important;
+    }
+
+    .modal-caja-impresion {
+        max-width: 100% !important;
+        max-height: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: #FFFFFF !important;
+        overflow: visible !important;
+    }
+
+    .contenedor-hoja-impresion {
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .hoja-comprobante {
+        background: #FFFFFF !important;
+        color: #0F172A !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    .comprobante-cabecera {
+        border-bottom-color: #1E293B !important;
+    }
+
+    .comprobante-marca p,
+    .comprobante-etq,
+    .comprobante-fecha,
+    .comprobante-pie {
+        color: #475569 !important;
+    }
+
+    .comprobante-meta {
+        background-color: #F8FAFC !important;
+        border-color: #CBD5E1 !important;
+        color: #0F172A !important;
+        break-inside: avoid;
+    }
+
+    .comprobante-tabla-wrap {
+        overflow: visible !important;
+    }
+
+    .tabla-comprobante {
+        min-width: 100% !important;
+    }
+
+    .tabla-comprobante thead th {
+        background-color: #1E293B !important;
+        color: #FFFFFF !important;
+        border-bottom-color: #1E293B !important;
+    }
+
+    .tabla-comprobante tbody td {
+        color: #0F172A !important;
+        border-bottom-color: #E2E8F0 !important;
+    }
+
+    .tabla-comprobante tbody tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .tabla-comprobante tbody tr:nth-child(even) {
+        background-color: #F8FAFC !important;
+    }
+
+    .comprobante-totales {
+        border-top-color: #1E293B !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    .comprobante-tot-linea.desc {
+        color: #B45309 !important;
+    }
+
+    .comprobante-tot-linea.final {
+        color: #15803D !important;
+        border-top-color: #CBD5E1 !important;
     }
 }

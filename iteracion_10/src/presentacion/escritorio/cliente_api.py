@@ -4,6 +4,8 @@ import requests
 import customtkinter as ctk
 from typing import Dict, List, Any, Optional, Callable
 
+
+
 # =============================================================================
 #  CLIENTE HTTP CENTRALIZADO Y GESTOR DE UI (CAPA 4 - PRESENTACIÓN ESCRITORIO)
 # =============================================================================
@@ -66,6 +68,7 @@ class ClienteAPI:
             return respuesta.status_code == 200
         except requests.RequestException:
             return False
+
 
     # --------------------------------------------------------------------------
     #  1. MÉTODOS DE AUTENTICACIÓN Y PERFILES (USUARIOS, RRHH, CLIENTES, PROV.)
@@ -160,6 +163,7 @@ class ClienteAPI:
         except requests.RequestException as e:
             raise ErrorClienteAPI(f"Error de red al eliminar perfil: {e}")
 
+
     # --------------------------------------
     #  2. MÉTODOS DE INVENTARIO Y PRODUCTOS
     # --------------------------------------
@@ -239,6 +243,7 @@ class ClienteAPI:
         except requests.RequestException as e:
             raise ErrorClienteAPI(f"Error de red al eliminar producto: {e}")
 
+
     # ----------------------------------------------------------
     #  3. MÉTODOS DE OPERACIONES COMERCIALES (FACTURACIÓN Y BI)
     # ----------------------------------------------------------
@@ -281,9 +286,10 @@ class ClienteAPI:
             raise ErrorClienteAPI(f"Error de red al anular factura: {e}")
 
 
-# =============================================================================
+
+# ===================================================================
 #  GESTOR CENTRALIZADO DE TEMAS, I18N (ES/EN) Y ACCESIBILIDAD (WCAG)
-# =============================================================================
+# ===================================================================
 
 _PALETAS = {
     ("light", False): {
@@ -455,7 +461,7 @@ for _r in _ROLES_A_EN:
 
 _TRADUCCIONES = {
     "es": {
-        # Comunes y preferencias
+        # Comunes y preferencias.
         "app_titulo": "FRANKIE GESTOR",
         "app_subtitulo": "Sistema de Gestión Comercial",
         "btn_cerrar": "Cerrar",
@@ -475,7 +481,7 @@ _TRADUCCIONES = {
         "btn_idioma": "EN",
         "atajos_hint": "Atajos: F5 Actualizar | Ctrl+F Buscar | Esc Cerrar",
 
-        # Alertas comunes
+        # Alertas comunes.
         "val_tit": "Validación",
         "err_com_tit": "Error de Comunicación",
         "err_tx_tit": "Error de Transacción",
@@ -487,7 +493,7 @@ _TRADUCCIONES = {
         "err_fmt_tit": "Error de Formato",
         "err_sel_tit": "Selección Requerida",
 
-        # Login
+        # Login.
         "login_win": "FRANKIE GESTOR - Acceso al Sistema",
         "login_usu": "Usuario",
         "login_usu_ph": "Ej: admin",
@@ -503,7 +509,7 @@ _TRADUCCIONES = {
         "login_bloq_tit": "Bloqueo de Seguridad",
         "login_bloq_msg": "Superaste el límite de intentos fallidos. El sistema se cerrará.",
 
-        # Panel de Control
+        # Panel de Control.
         "panel_win": "FRANKIE GESTOR - Panel de Control",
         "panel_op": "Operador: {nombre} {apellido}  |  Rol: {rol}",
         "panel_bienv": "BIENVENIDO/A, {nombre} {apellido}",
@@ -523,7 +529,7 @@ _TRADUCCIONES = {
         "bkp_err_tit": "Error de Backup",
         "bkp_err_msg": "No se pudo generar el respaldo:\n{err}",
 
-        # Usuarios (IAM)
+        # Usuarios (IAM).
         "usu_win": "GESTIÓN DE USUARIOS",
         "usu_header": "GESTIÓN DE USUARIOS Y CREDENCIALES (IAM)",
         "usu_nombres": "Nombres *",
@@ -545,7 +551,7 @@ _TRADUCCIONES = {
         "col_nombres": "Nombres",
         "col_apellidos": "Apellidos",
 
-        # Empleados (RRHH)
+        # Empleados (RRHH).
         "emp_win": "FORMULARIO EMPLEADOS (RRHH)",
         "emp_header": "RECURSOS HUMANOS — LEGAJOS DE EMPLEADOS",
         "emp_dni": "DNI",
@@ -571,7 +577,7 @@ _TRADUCCIONES = {
         "col_cp": "CP",
         "col_rol": "Rol",
 
-        # Clientes
+        # Clientes.
         "cli_win": "FORMULARIO CLIENTES",
         "cli_header": "GESTIÓN DE CLIENTES",
         "cli_cp": "Código Postal",
@@ -581,7 +587,7 @@ _TRADUCCIONES = {
         "cli_req": "Nombres y Apellidos son obligatorios.",
         "cli_sel_req": "Seleccioná primero un cliente de la tabla.",
 
-        # Proveedores
+        # Proveedores.
         "prov_win": "FORMULARIO PROVEEDORES",
         "prov_header": "GESTIÓN DE PROVEEDORES",
         "prov_razon": "Razón Social *",
@@ -596,7 +602,7 @@ _TRADUCCIONES = {
         "col_cuit": "CUIT",
         "col_contacto": "Contacto",
 
-        # Stock
+        # Stock.
         "stk_win": "FORMULARIO STOCK E INVENTARIO",
         "stk_header": "CONTROL DE STOCK E INVENTARIO",
         "stk_codigo": "Código *",
@@ -630,7 +636,7 @@ _TRADUCCIONES = {
         "col_ubic": "Ubicación",
         "col_venc": "Vencimiento",
 
-        # Facturación
+        # Facturación.
         "fac_win": "FORMULARIO FACTURACIÓN",
         "fac_header": "FACTURACIÓN Y OPERACIONES COMERCIALES",
         "fac_vendedor": "Datos del Vendedor *",
@@ -648,6 +654,7 @@ _TRADUCCIONES = {
         "fac_btn_guardar": "Guardar Facturación",
         "fac_btn_modificar": "Modificar Facturación",
         "fac_btn_eliminar": "Eliminar Facturación",
+        "fac_btn_imprimir": "Imprimir Factura",
         "fac_total": "TOTAL FACTURA: $ {monto}",
         "fac_total_desc": "Total con descuento ({pct}%): $ {monto}",
         "fac_desc_global": "Descuento Global (%):",
@@ -661,13 +668,32 @@ _TRADUCCIONES = {
         "fac_rep_msg": "El producto llegó a su stock mínimo. Quedan {u} unidades.",
         "fac_desc_num": "Ingresá un porcentaje numérico válido.",
         "fac_desc_rango": "El descuento global debe estar entre 0 y 100%.",
+        "fac_imp_vacio": "No hay operaciones cargadas en la tabla para imprimir.",
+        "fac_imp_win": "VISTA PREVIA DE FACTURA — IMPRESIÓN / PDF",
+        "fac_imp_sub": "Comprobante Comercial — FRANKIE GESTOR",
+        "fac_imp_modo_todo": "Tabla Completa",
+        "fac_imp_modo_sel": "Ítem Seleccionado",
+        "fac_imp_btn_web": "Imprimir / Guardar PDF",
+        "fac_imp_nro": "Comprobante N°",
+        "fac_imp_resumen": "Resumen Consolidado ({n} ítems)",
+        "fac_imp_fecha": "Fecha de emisión",
+        "fac_imp_vendedor": "Vendedor",
+        "fac_imp_cliente": "Cliente",
+        "fac_imp_dni": "DNI",
+        "fac_imp_domicilio": "Domicilio",
+        "fac_imp_subtotal": "Subtotal",
+        "fac_imp_desc_global": "Descuento Global ({pct}%)",
+        "fac_imp_total_final": "TOTAL A PAGAR",
+        "fac_imp_pie": "Documento comercial interno — No válido como factura fiscal — Generado por FRANKIE GESTOR",
+        "fac_imp_varios": "Varios / Ver detalle",
+        "fac_imp_err_web": "No se pudo abrir la vista de impresión en el navegador: {err}",
         "col_prod": "Producto",
         "col_cant": "Cantidad",
         "col_valor": "Valor en $",
         "col_desc_pct": "Descuento en %",
         "col_total": "Total en $",
 
-        # Consola SQL
+        # Consola SQL.
         "sql_win": "CONSOLA SQL - AUDITORÍA (SOLO LECTURA)",
         "sql_header": "CONSOLA SQL — AUDITORÍA EN SANDBOX (SOLO LECTURA)",
         "sql_rapidas": "Consultas rápidas:",
@@ -682,7 +708,7 @@ _TRADUCCIONES = {
         "sql_bloq_msg": "Transacción abortada. Operación destructiva detectada.\nEsta consola es de Solo Lectura (SELECT).",
         "sql_solo_sel": "Error SQL: Solo se admiten sentencias que comiencen con SELECT.",
 
-        # Analítica BI
+        # Analítica BI.
         "bi_win": "ANALÍTICA DE VENTAS - TABLERO BI / OLAP",
         "bi_header": "TABLERO DE CONTROL — ANALÍTICA BI / OLAP",
         "bi_sub_ini": "Análisis estadístico en tiempo real",
@@ -723,7 +749,7 @@ _TRADUCCIONES = {
         "btn_idioma": "ES",
         "atajos_hint": "Shortcuts: F5 Refresh | Ctrl+F Search | Esc Close",
 
-        # Common alerts
+        # Common alerts.
         "val_tit": "Validation",
         "err_com_tit": "Communication Error",
         "err_tx_tit": "Transaction Error",
@@ -735,7 +761,7 @@ _TRADUCCIONES = {
         "err_fmt_tit": "Format Error",
         "err_sel_tit": "Selection Required",
 
-        # Login
+        # Login.
         "login_win": "FRANKIE GESTOR - System Sign In",
         "login_usu": "Username",
         "login_usu_ph": "e.g. admin",
@@ -751,7 +777,7 @@ _TRADUCCIONES = {
         "login_bloq_tit": "Security Lockout",
         "login_bloq_msg": "Maximum failed attempts exceeded. The application will close.",
 
-        # Dashboard
+        # Dashboard.
         "panel_win": "FRANKIE GESTOR - Control Panel",
         "panel_op": "Operator: {nombre} {apellido}  |  Role: {rol}",
         "panel_bienv": "WELCOME, {nombre} {apellido}",
@@ -771,7 +797,7 @@ _TRADUCCIONES = {
         "bkp_err_tit": "Backup Error",
         "bkp_err_msg": "Could not generate backup:\n{err}",
 
-        # Users (IAM)
+        # Users (IAM).
         "usu_win": "USER MANAGEMENT",
         "usu_header": "USER & CREDENTIALS MANAGEMENT (IAM)",
         "usu_nombres": "First Name *",
@@ -793,7 +819,7 @@ _TRADUCCIONES = {
         "col_nombres": "First Name",
         "col_apellidos": "Last Name",
 
-        # Employees (HR)
+        # Employees (HR).
         "emp_win": "EMPLOYEES FORM (HR)",
         "emp_header": "HUMAN RESOURCES — EMPLOYEE RECORDS",
         "emp_dni": "ID / DNI",
@@ -819,7 +845,7 @@ _TRADUCCIONES = {
         "col_cp": "ZIP",
         "col_rol": "Role",
 
-        # Customers
+        # Customers.
         "cli_win": "CUSTOMERS FORM",
         "cli_header": "CUSTOMER MANAGEMENT",
         "cli_cp": "Postal Code",
@@ -829,7 +855,7 @@ _TRADUCCIONES = {
         "cli_req": "First Name and Last Name are required.",
         "cli_sel_req": "Please select a customer from the table first.",
 
-        # Suppliers
+        # Suppliers.
         "prov_win": "SUPPLIERS FORM",
         "prov_header": "SUPPLIER MANAGEMENT",
         "prov_razon": "Company Name *",
@@ -844,7 +870,7 @@ _TRADUCCIONES = {
         "col_cuit": "CUIT",
         "col_contacto": "Contact",
 
-        # Stock
+        # Stock.
         "stk_win": "INVENTORY & STOCK FORM",
         "stk_header": "INVENTORY & STOCK CONTROL",
         "stk_codigo": "SKU / Code *",
@@ -878,7 +904,7 @@ _TRADUCCIONES = {
         "col_ubic": "Location",
         "col_venc": "Expiration",
 
-        # Invoicing
+        # Invoicing.
         "fac_win": "INVOICING FORM",
         "fac_header": "INVOICING & COMMERCIAL OPERATIONS",
         "fac_vendedor": "Salesperson *",
@@ -896,6 +922,7 @@ _TRADUCCIONES = {
         "fac_btn_guardar": "Save Invoice",
         "fac_btn_modificar": "Update Invoice",
         "fac_btn_eliminar": "Delete Invoice",
+        "fac_btn_imprimir": "Print Invoice",
         "fac_total": "INVOICE TOTAL: $ {monto}",
         "fac_total_desc": "Total with discount ({pct}%): $ {monto}",
         "fac_desc_global": "Global Discount (%):",
@@ -909,13 +936,32 @@ _TRADUCCIONES = {
         "fac_rep_msg": "Product reached minimum stock level. {u} units remaining.",
         "fac_desc_num": "Please enter a valid numeric percentage.",
         "fac_desc_rango": "Global discount must be between 0 and 100%.",
+        "fac_imp_vacio": "There are no invoice records in the table to print.",
+        "fac_imp_win": "INVOICE PREVIEW — PRINT / PDF",
+        "fac_imp_sub": "Commercial Receipt — FRANKIE GESTOR",
+        "fac_imp_modo_todo": "Full Table",
+        "fac_imp_modo_sel": "Selected Item",
+        "fac_imp_btn_web": "Print / Save PDF",
+        "fac_imp_nro": "Invoice #",
+        "fac_imp_resumen": "Consolidated Summary ({n} items)",
+        "fac_imp_fecha": "Issue Date",
+        "fac_imp_vendedor": "Salesperson",
+        "fac_imp_cliente": "Customer",
+        "fac_imp_dni": "ID / DNI",
+        "fac_imp_domicilio": "Address",
+        "fac_imp_subtotal": "Subtotal",
+        "fac_imp_desc_global": "Global Discount ({pct}%)",
+        "fac_imp_total_final": "TOTAL DUE",
+        "fac_imp_pie": "Internal commercial receipt — Not a fiscal invoice — Generated by FRANKIE GESTOR",
+        "fac_imp_varios": "Multiple / See detail",
+        "fac_imp_err_web": "Could not open print preview in browser: {err}",
         "col_prod": "Product",
         "col_cant": "Qty",
         "col_valor": "Unit Price $",
         "col_desc_pct": "Discount %",
         "col_total": "Total $",
 
-        # SQL Console
+        # SQL Console.
         "sql_win": "SQL CONSOLE - AUDIT (READ-ONLY)",
         "sql_header": "SQL CONSOLE — SANDBOX AUDIT (READ-ONLY)",
         "sql_rapidas": "Quick queries:",
@@ -930,7 +976,7 @@ _TRADUCCIONES = {
         "sql_bloq_msg": "Transaction aborted. Destructive operation detected.\nThis console is Read-Only (SELECT).",
         "sql_solo_sel": "SQL Error: Only SELECT statements are allowed.",
 
-        # BI Analytics
+        # BI Analytics.
         "bi_win": "SALES ANALYTICS - BI / OLAP DASHBOARD",
         "bi_header": "CONTROL DASHBOARD — BI / OLAP ANALYTICS",
         "bi_sub_ini": "Real-time statistical analysis",

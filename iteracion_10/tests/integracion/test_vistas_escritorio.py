@@ -10,9 +10,10 @@ import customtkinter as ctk
 from fastapi.testclient import TestClient
 
 
-# =================================================================================
+
+# ===============================================================================
 #  SUITE DE INTEGRACIÓN E2E: VISTAS DE ESCRITORIO (CUSTOMTKINTER + API REST)
-# =================================================================================
+# ===============================================================================
 #  UBICACIÓN: tests/integracion/test_vistas_escritorio.py
 #
 #  DECISIÓN DE DISEÑO:
@@ -21,9 +22,10 @@ from fastapi.testclient import TestClient
 #   CustomTkinter conectadas en memoria al servidor FastAPI (TestClient) y a una
 #   base SQLite temporal con el esquema 3FN completo (esquema.sql).
 #   Verifica dimensiones (<= 1280x720), matriz RBAC, coexistencia IAM/RRHH,
-#   persistencia 3FN sin cachés locales, facturación atómica, Sandboxing SQL, BI,
-#   Modo Oscuro, Alto Contraste WCAG, Zoom, i18n ES/EN, semáforo y búsqueda en vivo.
-# =================================================================================
+#   persistencia 3FN sin cachés locales, facturación atómica, impresión/PDF,
+#   Sandboxing SQL, BI, Modo Oscuro, Alto Contraste WCAG, Zoom, i18n ES/EN,
+#   semáforo y búsqueda en vivo.
+# ===============================================================================
 
 DIRECTORIO_ACTUAL = os.path.dirname(os.path.abspath(__file__))
 DIRECTORIO_TESTS = os.path.dirname(DIRECTORIO_ACTUAL)
@@ -198,6 +200,7 @@ def entorno_escritorio(tmp_path, monkeypatch):
         root.destroy()
     except tk.TclError:
         pass
+
 
 
 # ==========================================================
@@ -652,3 +655,135 @@ def test_8_modo_oscuro_bilingue_accesibilidad_semaforo_y_buscador(entorno_escrit
     gestor_ui.alternar_tema()
     assert canvases_bi[0].cget("bg") == gestor_ui.paleta()["canvas_bg"]
     win_bi.destroy()
+
+
+def test_9_facturacion_vista_previa_impresion_popup_y_pdf(entorno_escritorio, monkeypatch, tmp_path):
+    """
+     Verifica la funcionalidad de Impresión / PDF de Factura (Opción B - Dual)
+     100% en Capa 4 sin modificar el Backend:
+     1. Alerta preventiva cuando la tabla está vacía.
+     2. Pop-up CTkToplevel inicia por defecto en modo 'Tabla Completa + Descuento Global'.
+     3. Conmutador dual hacia 'Ítem Seleccionado' cuando hay una fila marcada.
+     4. Exportación de comprobante HTML imprimible (@media print + window.print) vía navegador.
+    """
+    root = entorno_escritorio["root"]
+    alertas = entorno_escritorio["alertas"]
+
+    win_fac = mod_facturacion.Facturacion(root)
+    _validar_resolucion_maxima(win_fac)
+
+    # 1. Sin facturas cargadas debe advertir y no abrir el pop-up.
+    _clicar_boton(_buscar_boton_por_texto(win_fac, "Imprimir Factura"))
+    assert len(alertas["warning"]) >= 1
+    assert win_fac._ventana_impresion is None
+
+    # 2. Creamos actores (con legajo 3FN completo) y 2 facturas en el Backend.
+    id_prov = cliente_http.crear_perfil({"nombres": "Prov Imp", "apellidos": "SA", "dni": "30-11111111-9", "rol": "Proveedor"})["id"]
+    id_vend = cliente_http.crear_perfil({"nombres": "Sofía", "apellidos": "Ventas", "dni": "29111222", "rol": "Empleado - Ventas"})["id"]
+    id_cli = cliente_http.crear_perfil({
+        "nombres": "Carla",
+        "apellidos": "Méndez",
+        "dni": "33444555",
+        "rol": "Cliente",
+        "direccion": "Av. Colón 1500",
+        "ciudad": "Mar del Plata",
+        "provincia": "Buenos Aires",
+        "cp": "7600"
+    })["id"]
+    id_prod_1 = cliente_http.crear_producto({
+        "codigo": "IMP-01",
+        "descripcion": "Mouse Inalámbrico",
+        "categoria": "Perifericos",
+        "id_proveedor": id_prov,
+        "precio_costo": 6000.0,
+        "precio_venta": 10000.0,
+        "stock_actual": 20.0,
+        "stock_minimo": 2.0
+    })["id"]
+    id_prod_2 = cliente_http.crear_producto({
+        "codigo": "IMP-02",
+        "descripcion": "Pad Gamer XL",
+        "categoria": "Accesorios",
+        "id_proveedor": id_prov,
+        "precio_costo": 2500.0,
+        "precio_venta": 5000.0,
+        "stock_actual": 15.0,
+        "stock_minimo": 2.0
+    })["id"]
+
+    cliente_http.emitir_factura({
+        "id_vendedor": id_vend,
+        "id_cliente": id_cli,
+        "id_producto": id_prod_1,
+        "cantidad": 2.0,
+        "descuento": 0.0
+    })
+    cliente_http.emitir_factura({
+        "id_vendedor": id_vend,
+        "id_cliente": id_cli,
+        "id_producto": id_prod_2,
+        "cantidad": 1.0,
+        "descuento": 0.0
+    })
+
+    # Refrescamos la vista y aplicamos 10% de descuento global (25,000 -> 22,500).
+    _clicar_boton(_buscar_boton_por_texto(win_fac, "Actualizar"))
+    tabla_fac = _buscar_treeview(win_fac)
+    assert len(tabla_fac.get_children()) == 2
+
+    cajas_fac = _buscar_widgets(win_fac, ctk.CTkEntry)
+    _escribir_entry(cajas_fac[-1], "10")
+    _clicar_boton(_buscar_boton_por_texto(win_fac, "Calcular Descuento Final"))
+    assert win_fac._porcentaje_global_activo == 10.0
+
+    # Marcamos una fila para verificar que el pop-up habilite el selector dual pero abra en 'Tabla Completa'.
+    iid_primera = tabla_fac.get_children()[0]
+    tabla_fac.selection_set(iid_primera)
+    tabla_fac.event_generate("<<TreeviewSelect>>")
+    win_fac.update()
+
+    _clicar_boton(_buscar_boton_por_texto(win_fac, "Imprimir Factura"))
+    popup = win_fac._ventana_impresion
+    assert popup is not None and popup.winfo_exists()
+    _validar_resolucion_maxima(popup)
+
+    tabla_pop = _buscar_treeview(popup)
+    assert len(tabla_pop.get_children()) == 2
+
+    textos_pop = " | ".join(str(lbl.cget("text")) for lbl in _buscar_widgets(popup, ctk.CTkLabel))
+    assert "25,000.00" in textos_pop
+    assert "10%" in textos_pop
+    assert "22,500.00" in textos_pop
+    assert "33444555" in textos_pop
+    assert "Av. Colón 1500" in textos_pop
+
+    # 3. Alternar a 'Ítem Seleccionado' y volver a 'Tabla Completa'.
+    _clicar_boton(_buscar_boton_por_texto(popup, "Ítem Seleccionado"))
+    assert len(tabla_pop.get_children()) == 1
+
+    _clicar_boton(_buscar_boton_por_texto(popup, "Tabla Completa"))
+    assert len(tabla_pop.get_children()) == 2
+
+    # 4. Exportación a vista imprimible HTML / PDF interceptando el navegador del SO.
+    uris_abiertas = []
+    monkeypatch.setattr(mod_facturacion.webbrowser, "open", lambda uri: uris_abiertas.append(uri) or True)
+    monkeypatch.setattr(mod_facturacion.tempfile, "gettempdir", lambda: str(tmp_path))
+
+    _clicar_boton(_buscar_boton_por_texto(popup, "Imprimir / Guardar PDF"))
+    assert len(uris_abiertas) == 1
+    assert uris_abiertas[0].startswith("file://")
+    assert uris_abiertas[0].endswith(".html")
+
+    archivos_html = list(tmp_path.glob("frankie_factura_*.html"))
+    assert len(archivos_html) == 1
+    html_generado = archivos_html[0].read_text(encoding="utf-8")
+    assert "@media print" in html_generado
+    assert "window.print()" in html_generado
+    assert "IMP-01 - Mouse Inalámbrico" in html_generado
+    assert "IMP-02 - Pad Gamer XL" in html_generado
+    assert "22,500.00" in html_generado
+    assert "33444555" in html_generado
+    assert "Av. Colón 1500" in html_generado
+
+    popup.destroy()
+    win_fac.destroy()

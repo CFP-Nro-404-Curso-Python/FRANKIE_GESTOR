@@ -10,6 +10,7 @@ import customtkinter as ctk
 from fastapi.testclient import TestClient
 
 
+
 # ================================================================================
 #  SUITE DE INTEGRACIÓN: CLIENTE WEB SPA Y SINCRONIZACIÓN 3FN CON ESCRITORIO
 # ================================================================================
@@ -18,9 +19,10 @@ from fastapi.testclient import TestClient
 #  DECISIÓN DE DISEÑO:
 #
 #   Verifica la integridad responsive de la SPA Web (paleta Slate/Blue unificada,
-#   Modo Oscuro, Alto Contraste WCAG, i18n ES/EN, cero localStorage, CORS LAN) y
-#   garantiza la sincronización bidireccional real en SQLite 3FN de legajos
-#   personales y ubicaciones de stock entre el navegador (PC/Móvil) y CustomTkinter.
+#   Modo Oscuro, Alto Contraste WCAG, i18n ES/EN, impresión/PDF @media print,
+#   cero localStorage, CORS LAN) y garantiza la sincronización bidireccional
+#   real en SQLite 3FN de legajos personales y ubicaciones de stock entre el
+#   navegador (PC/Móvil) y CustomTkinter.
 # ================================================================================
 
 DIRECTORIO_ACTUAL = os.path.dirname(os.path.abspath(__file__))
@@ -178,6 +180,7 @@ def entorno_multicliente(tmp_path, monkeypatch):
         root.destroy()
     except tk.TclError:
         pass
+
 
 
 # ======================================================================
@@ -559,3 +562,69 @@ def test_7_paridad_web_spa_temas_bilingue_wcag_buscadores_y_bi():
     assert "acortarEtiquetaBI" in js
     assert "obtenerTokensCanvas" in js
     assert 'evento.key === "Escape"' in js
+
+
+def test_8_paridad_impresion_factura_web_modal_y_media_print():
+    """
+     Verifica que la SPA Web implemente en paridad 1:1 la vista previa e
+     impresión / PDF de facturas (Opción B - Dual, por defecto Tabla Completa +
+     Descuento Global) sin modificar el Backend ni usar localStorage.
+    """
+    ruta_html = os.path.join(DIRECTORIO_WEB, "index.html")
+    ruta_css = os.path.join(DIRECTORIO_WEB, "estilos.css")
+    ruta_js = os.path.join(DIRECTORIO_WEB, "app_web.js")
+
+    with open(ruta_html, "r", encoding="utf-8") as f:
+        html = f.read()
+    with open(ruta_css, "r", encoding="utf-8") as f:
+        css = f.read()
+    with open(ruta_js, "r", encoding="utf-8") as f:
+        js = f.read()
+
+    # Botón, modal de vista previa y elementos del comprobante en HTML.
+    for id_imp in (
+        "btn-fac-imprimir",
+        "modal-impresion-factura",
+        "area-impresion-factura",
+        "imp-barra-modo",
+        "btn-imp-modo-todo",
+        "btn-imp-modo-sel",
+        "btn-imp-web-print",
+        "tabla-impresion-factura",
+        "imp-nro",
+        "imp-cliente",
+        "imp-vendedor",
+        "imp-dni",
+        "imp-domicilio",
+        "imp-subtotal",
+        "imp-fila-desc-global",
+        "imp-total-final",
+    ):
+        assert f'id="{id_imp}"' in html, f"Falta '{id_imp}' en index.html"
+
+    assert "abrirVistaPreviaFacturaWeb()" in html
+    assert "imprimirFacturaWeb()" in html
+    assert "no-print" in html
+
+    # Reglas de maquetado e impresión PDF limpia en CSS.
+    assert "@media print" in css
+    assert ".no-print" in css
+    assert ".hoja-comprobante" in css
+    assert ".tabla-comprobante" in css
+    assert "print-color-adjust: exact" in css
+
+    # Lógica de comprobante dual (por defecto 'todo') e i18n en JS.
+    assert "abrirVistaPreviaFacturaWeb" in js
+    assert "construirDatosComprobanteWeb" in js
+    assert "renderizarVistaPreviaFacturaWeb" in js
+    assert "cambiarModoImpresionWeb" in js
+    assert "cerrarVistaPreviaFacturaWeb" in js
+    assert "imprimirFacturaWeb" in js
+    assert "window.print()" in js
+    assert 'modoImpresionWeb = "todo"' in js
+    assert "mapaClientesIdAObj" in js
+    assert "mapaVendedoresIdAObj" in js
+    assert "fac_btn_imprimir" in js
+    assert "fac_imp_modo_todo" in js
+    assert "fac_imp_modo_sel" in js
+    assert "localStorage." not in js

@@ -6,7 +6,7 @@ El objetivo central de esta arquitectura es garantizar que las capas de **Domini
 
 * **Desacople Físico y Lógico:** Ninguna vista (`escritorio` en CustomTkinter o `web` en HTML/JS) posee acceso al motor `sqlite3`, al archivo `frankie_gestor.db`, ni a la librería criptográfica `bcrypt`. La comunicación ocurre exclusivamente a través de contratos JSON sobre HTTP expuestos por `src/infraestructura/api/`.
 * **Única Fuente de Verdad (Sin Cachés de Negocio):** Todos los datos operativos —incluyendo el árbol completo de contactos, domicilios en 3FN y la ubicación física de stock— viajan por los endpoints REST y se persisten en SQLite. El cliente Web prescinde por completo de `localStorage` para datos maestros (utilizando `sessionStorage` únicamente para preferencias visuales efímeras de la pestaña), garantizando sincronización bidireccional en tiempo real entre el cliente de escritorio y múltiples dispositivos conectados por red local (PC y móviles).
-* **Inmutabilidad ante Nuevas Vistas:** Si se elimina la interfaz de escritorio, se rediseña la interfaz web o se incorpora un tercer cliente (ej. aplicación móvil nativa o CLI), los directorios `db/`, `src/dominio/`, `src/aplicacion/` y `src/infraestructura/` permanecen intactos.
+* **Inmutabilidad ante Nuevas Vistas y Funcionalidades UI:** Si se elimina la interfaz de escritorio, se rediseña la interfaz web, se incorporan capacidades de presentación (como la vista previa e impresión/PDF dual de comprobantes) o se suma un tercer cliente (ej. aplicación móvil nativa o CLI), los directorios `db/`, `src/dominio/`, `src/aplicacion/` y `src/infraestructura/` permanecen intactos.
 * **Bootstrap e Infraestructura Centralizada:** La inicialización del esquema relacional (`esquema.sql`), la inyección de la semilla criptográfica (`admin`), la generación de copias de seguridad (Backups JSON vía API), los lanzadores operativos (`.bat`) y el motor de Sandboxing SQL se ejecutan de forma controlada sin mezclar lógica de negocio con el renderizado visual.
 
 ---
@@ -40,14 +40,14 @@ Para eliminar las estructuras condicionales anidadas (`if/else`) que validaban p
 
 ---
 
-## 5. Capa 4 Reactiva: Patrón Observador (`GestorUI`), i18n y Accesibilidad (WCAG)
+## 5. Capa 4 Reactiva: Patrón Observador (`GestorUI`), i18n, Accesibilidad (WCAG) e Impresión/PDF
 
 Para lograr paridad estética y funcional 1:1 entre el cliente de escritorio (**CustomTkinter**, acotado a `<= 1280x720`) y el cliente **Web SPA responsive**, se unificó el *Design System* **Slate/Blue** bajo cuatro pilares:
 
-* **Patrón Observador (`GestorUI` en `cliente_api.py`):** Centraliza las paletas de temas, el catálogo bilingüe ES/EN y los parámetros de accesibilidad en un único sujeto observable (`suscribir()` / `_notificar()`), evitando duplicar diccionarios y estilos en las 10 vistas (DRY) sin alterar el árbol de directorios oficial. Al alternar tema, idioma, contraste o escala desde cualquier pantalla, todas las ventanas abiertas —incluyendo widgets híbridos como `ttk.Treeview` y gráficos `tk.Canvas`— se reconfiguran en caliente.
+* **Patrón Observador (`GestorUI` en `cliente_api.py`):** Centraliza las paletas de temas, el catálogo bilingüe ES/EN y los parámetros de accesibilidad en un único sujeto observable (`suscribir()` / `_notificar()`), evitando duplicar diccionarios y estilos en las 10 vistas (DRY) sin alterar el árbol de directorios oficial. Al alternar tema, idioma, contraste o escala desde cualquier pantalla, todas las ventanas abiertas —incluyendo widgets híbridos como `ttk.Treeview`, gráficos `tk.Canvas` y el pop-up de impresión— se reconfiguran en caliente.
 * **Internacionalización Segura en Frontera (ES / EN):** La traducción opera estrictamente sobre etiquetas visuales. Los selectores de roles convierten la etiqueta mostrada al usuario (`"Sales Employee"` ↔ `"Empleado - Ventas"`) hacia el valor canónico en español antes de emitir cualquier petición HTTP, preservando inmutable el contrato RBAC del Backend.
 * **Accesibilidad (WCAG 2.1 AA / AAA):** Ambas interfaces ofrecen **Modo Claro/Oscuro**, **Alto Contraste** (4 perfiles cromáticos con bordes reforzados y relación de contraste elevada), **Escalado Tipográfico** (`100%` / `115%` / `125%`), navegación por teclado (`Esc`, `Ctrl+F`, `F5`, `Ctrl+Enter`) y atributos semánticos ARIA (`role="toolbar"`, `aria-live="polite"`, `aria-pressed`, `:focus-visible`) en la Web.
-* **Usabilidad Operativa:** Buscadores instantáneos con contadores en vivo en todas las grillas, *zebra striping*, semáforo visual de inventario (`stock_actual <= stock_minimo` y agotado `<= 0`) y gráficos BI con escala numérica en eje Y y submuestreo dinámico anti-superposición.
+* **Usabilidad Operativa e Impresión / PDF Multi-Cliente:** Buscadores instantáneos con contadores en vivo en todas las grillas, *zebra striping*, semáforo visual de inventario (`stock_actual <= stock_minimo` y agotado `<= 0`), gráficos BI con escala numérica en eje Y y submuestreo anti-superposición, y **vista previa imprimible de facturas en modo dual** (por defecto **Tabla Completa + Descuento Global**, con conmutador hacia **Ítem Seleccionado** y legajo 3FN del cliente): implementada sin dependencias pesadas mediante pop-up `CTkToplevel` + HTML temporal con `webbrowser` en escritorio y modal + `window.print()` / `@media print` en la Web SPA.
 
 ---
 
@@ -96,7 +96,7 @@ Para facilitar el mantenimiento evolutivo, la auditoría académica y el estudio
 │       ├── 📝 etapa_1.md                             # Núcleo de Dominio y pruebas unitarias.
 │       ├── 📝 etapa_2.md                             # Casos de Uso, Persistencia 3FN y Triggers.
 │       ├── 📝 etapa_3.md                             # API REST, contratos 3FN y restitución atómica de stock.
-│       └── 📝 etapa_4.md                             # Clientes CustomTkinter/Web LAN, WCAG/i18n y pruebas E2E.
+│       └── 📝 etapa_4.md                             # Clientes CustomTkinter/Web LAN, WCAG/i18n, Impresión/PDF y E2E.
 ├── 📁 semillas/                                      # Pipeline ETL de datos de prueba.
 │   ├── 📜 empresa_ventas_1000.sql
 │   └── 🐍 generador_semilla_bi.py
@@ -108,7 +108,7 @@ Para facilitar el mantenimiento evolutivo, la auditoría académica y el estudio
 │   │   ├── 🐍 entidades.py                           # Entidades puras (PerfilUsuario 3FN, Producto con ubicación, Factura).
 │   │   ├── 🐍 excepciones.py                         # Errores de dominio (ErrorJerarquiaRBAC, ErrorStockInsuficiente, etc.).
 │   │   ├── 🐍 politicas_rbac.py                      # Patrón Estrategia: erradica los if/else anidados de permisos.
-│   │   └── 🐍 puertos.py                             # Clases Base Abstractas (Interfaces de Repositorios, UoW y Hash).
+│   │   └── 🐍 puertos.py                             # Clases Base Abstractas (Interfaces de Repositorios, UoW y Hashing).
 │   │
 │   ├── 📁 aplicacion/                                # CAPA 2: Casos de Uso (Orquestación pura).
 │   │   ├── 🐍 __init__.py
@@ -147,15 +147,15 @@ Para facilitar el mantenimiento evolutivo, la auditoría académica y el estudio
 │       │       ├── 🐍 clientes.py
 │       │       ├── 🐍 proveedores.py
 │       │       ├── 🐍 stock.py
-│       │       ├── 🐍 facturacion.py
+│       │       ├── 🐍 facturacion.py                 # Facturación + pop-up dual de vista previa e impresión/PDF vía navegador.
 │       │       ├── 🐍 consola.py
 │       │       └── 🐍 analitica.py
 │       └── 📁 web/                                   # Vista 2: Cliente ligero Web Responsive (HTML5 + CSS + JS Vanilla).
-│           ├── 🌐 index.html                         # SPA PC/Móvil con barra de accesibilidad, i18n y buscadores en vivo.
-│           ├── 🎨 estilos.css                        # Design System Slate/Blue: 4 perfiles (Claro/Oscuro/HC) + Zoom + Semáforo.
-│           └── 📜 app_web.js                         # Consumo asíncrono (fetch), i18n, Canvas BI y sessionStorage solo UI.
+│           ├── 🌐 index.html                         # SPA PC/Móvil con barra WCAG, i18n, buscadores y modal de impresión.
+│           ├── 🎨 estilos.css                        # Design System Slate/Blue: 4 perfiles, Zoom, Semáforo y @media print.
+│           └── 📜 app_web.js                         # Consumo fetch, i18n, impresión PDF dual, Canvas BI y sessionStorage UI.
 │
-├── 📁 tests/                                         # Suite de Pruebas Automatizadas (Metodología TDD - 35 tests).
+├── 📁 tests/                                         # Suite de Pruebas Automatizadas (Metodología TDD - 37 tests).
 │   ├── 🐍 __init__.py
 │   ├── 🐍 conftest.py                                # Configuración de entorno aislado (SQLite en RAM :memory:).
 │   ├── 📁 unitarios/
@@ -164,8 +164,8 @@ Para facilitar el mantenimiento evolutivo, la auditoría académica y el estudio
 │   └── 📁 integracion/
 │       ├── 🐍 test_repositorios_sql.py               # Verifica transacciones 3FN y disparo de Triggers SQLite.
 │       ├── 🐍 test_api_rest.py                       # Verifica respuestas HTTP, validaciones y bloqueos de seguridad.
-│       ├── 🐍 test_vistas_escritorio.py              # Verifica E2E las 9 ventanas CustomTkinter, Temas, i18n, WCAG y semáforo.
-│       └── 🐍 test_sincronizacion_web_escritorio.py  # Verifica SPA Web, paridad WCAG/i18n, CORS LAN y sincronía 3FN.
+│       ├── 🐍 test_vistas_escritorio.py              # Verifica E2E 9 ventanas CustomTkinter, WCAG/i18n e impresión/PDF.
+│       └── 🐍 test_sincronizacion_web_escritorio.py  # Verifica SPA Web, paridad WCAG/i18n/@media print, CORS y sincronía 3FN.
 │
 ├── 📁 .venv/
 ├── ⚙️ iniciar_frankie_gestor.bat                     # Lanzador operativo: activa .venv, inicia login.py y desactiva al cerrar.
@@ -173,16 +173,3 @@ Para facilitar el mantenimiento evolutivo, la auditoría académica y el estudio
 ├── 📄 pytest.ini                                     # Configuración de rutas para entorno de testing (Pytest).
 └── 📄 requirements.txt                               # Manifiesto de paquetes (bcrypt, fastapi, uvicorn, requests, customtkinter, pytest, httpx, etc.).
 ```
-
----
-
-### 📋 Lista de archivos `.md` que necesito que me pases para auditar y cerrar la documentación
-
-Con `etapa_1.md`, `etapa_2.md`, `etapa_3.md` y `diseño_arquitectonico.md` ya alineados, pasame estos archivos para auditarlos y dejarlos coherentes con los **35 tests**, los **9 diagramas `.svg`**, las mejoras de la Capa 4 y los lanzadores `.bat`:
-
-1. `docs/fundamentos/plan_construccion_guiado_TDD.md` *(para ajustar el conteo de 33 → 35 tests, sumar los 9 `.svg`, `GestorUI`/WCAG/i18n y los `.bat`)*.
-2. `docs/reportes/etapa_4.md` *(para registrar la migración a CustomTkinter, paridad Web, Modo Oscuro, i18n, WCAG, buscadores, semáforo y la evidencia oficial de `35 passed in 41.40s`)*.
-3. `docs/descripcion.md` *(entregable integrador de la Etapa 5 donde deben quedar incrustadas las referencias a los 9 diagramas `.svg` y todos los patrones de diseño)*.
-4. `README.md` y `README_esp.md` *(si ya los tenés creados en la raíz del repositorio para auditar instrucciones de ejecución con los `.bat`, arquitectura y badges/diagramas)*.
-
-Pasamelos en la tanda que te quede más cómoda y los auditamos uno por uno.

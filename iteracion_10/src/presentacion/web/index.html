@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="es" data-theme="light" data-contrast="normal" data-scale="1">
 
     <head>
@@ -15,7 +16,7 @@
         <!--  BARRA SUPERIOR DE NAVEGACIÓN, ACCESIBILIDAD Y PREFERENCIAS UI  -->
         <!-- =============================================================== -->
 
-        <header id="barra-superior" class="barra-superior">
+        <header id="barra-superior" class="barra-superior no-print">
             <div class="barra-contenedor">
                 <div class="barra-marca">
                     <span class="icono-marca" aria-hidden="true">📦</span>
@@ -41,11 +42,12 @@
         </header>
 
 
+
         <!-- =============================================================== -->
         <!--  CUADRO DE DIÁLOGO MODAL (EQUIVALENTE A MESSAGEBOX DE TKINTER)  -->
         <!-- =============================================================== -->
 
-        <div id="modal-alerta" class="modal-fondo oculto" role="dialog" aria-modal="true" aria-labelledby="modal-titulo" aria-describedby="modal-mensaje">
+        <div id="modal-alerta" class="modal-fondo oculto no-print" role="dialog" aria-modal="true" aria-labelledby="modal-titulo" aria-describedby="modal-mensaje">
             <div class="modal-caja">
                 <div id="modal-cabecera" class="modal-cabecera">
                     <h3 id="modal-titulo">Aviso del Sistema</h3>
@@ -60,11 +62,103 @@
         </div>
 
 
+
+        <!-- ====================================================================== -->
+        <!--  MODAL DE VISTA PREVIA E IMPRESIÓN / PDF DE FACTURA (OPCIÓN B - DUAL)  -->
+        <!-- ====================================================================== -->
+
+        <div id="modal-impresion-factura" class="modal-fondo modal-impresion oculto" role="dialog" aria-modal="true" aria-labelledby="imp-modal-titulo">
+            <div class="modal-caja-impresion">
+                <div class="modal-cabecera-impresion no-print">
+                    <h3 id="imp-modal-titulo" data-i18n="fac_imp_win">VISTA PREVIA DE FACTURA — IMPRESIÓN / PDF</h3>
+                    <div class="acciones-impresion">
+                        <button type="button" id="btn-imp-web-print" class="btn btn-teal btn-sm" onclick="imprimirFacturaWeb()" data-i18n="fac_imp_btn_web">
+                            Imprimir / Guardar PDF
+                        </button>
+                        <button type="button" id="btn-imp-web-cerrar" class="btn btn-gris-azulado btn-sm" onclick="cerrarVistaPreviaFacturaWeb()" data-i18n="btn_cerrar">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+
+                <div id="imp-barra-modo" class="barra-modo-impresion oculto no-print" role="group" aria-label="Modo de impresión">
+                    <button type="button" id="btn-imp-modo-todo" class="btn btn-sm btn-azul" onclick="cambiarModoImpresionWeb('todo')" data-i18n="fac_imp_modo_todo">
+                        Tabla Completa
+                    </button>
+                    <button type="button" id="btn-imp-modo-sel" class="btn btn-sm btn-gris" onclick="cambiarModoImpresionWeb('seleccionada')" data-i18n="fac_imp_modo_sel">
+                        Ítem Seleccionado
+                    </button>
+                </div>
+
+                <div class="contenedor-hoja-impresion">
+                    <article id="area-impresion-factura" class="hoja-comprobante">
+                        <div class="comprobante-cabecera">
+                            <div class="comprobante-marca">
+                                <h2>FRANKIE GESTOR</h2>
+                                <p data-i18n="fac_imp_sub">Comprobante Comercial — FRANKIE GESTOR</p>
+                            </div>
+                            <div class="comprobante-nro">
+                                <span class="comprobante-etq" data-i18n="fac_imp_nro">Comprobante N°</span>
+                                <strong id="imp-nro">-</strong>
+                                <span id="imp-fecha" class="comprobante-fecha">-</span>
+                            </div>
+                        </div>
+
+                        <div class="comprobante-meta">
+                            <div><strong data-i18n="fac_imp_cliente">Cliente</strong>: <span id="imp-cliente">-</span></div>
+                            <div><strong data-i18n="fac_imp_vendedor">Vendedor</strong>: <span id="imp-vendedor">-</span></div>
+                            <div><strong data-i18n="fac_imp_dni">DNI</strong>: <span id="imp-dni">-</span></div>
+                            <div><strong data-i18n="fac_imp_domicilio">Domicilio</strong>: <span id="imp-domicilio">-</span></div>
+                        </div>
+
+                        <div class="comprobante-tabla-wrap">
+                            <table id="tabla-impresion-factura" class="tabla-comprobante">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th data-i18n="col_prod">Producto</th>
+                                        <th class="num" data-i18n="col_cant">Cantidad</th>
+                                        <th class="num" data-i18n="col_valor">Valor en $</th>
+                                        <th class="num" data-i18n="col_desc_pct">Descuento en %</th>
+                                        <th class="num" data-i18n="col_total">Total en $</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        <div class="comprobante-totales">
+                            <div class="comprobante-tot-linea">
+                                <span data-i18n="fac_imp_subtotal">Subtotal</span>
+                                <span id="imp-subtotal">$ 0.00</span>
+                            </div>
+                            <div id="imp-fila-desc-global" class="comprobante-tot-linea desc oculto">
+                                <span id="imp-desc-global-lbl">Descuento Global (0%)</span>
+                                <span id="imp-desc-global-monto">- $ 0.00</span>
+                            </div>
+                            <div class="comprobante-tot-linea final">
+                                <span data-i18n="fac_imp_total_final">TOTAL A PAGAR</span>
+                                <span id="imp-total-final">$ 0.00</span>
+                            </div>
+                        </div>
+
+                        <p class="comprobante-pie" data-i18n="fac_imp_pie">
+                            Documento comercial interno — No válido como factura fiscal — Generado por FRANKIE GESTOR
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </div>
+
+
+
         <!-- ====================================== -->
         <!--  CONTENEDOR PRINCIPAL DE VISTAS (SPA)  -->
         <!-- ====================================== -->
 
-        <main class="contenedor-principal">
+        <main class="contenedor-principal no-print">
+
+
 
             <!-- ======================================= -->
             <!--  1. VISTA DE LOGIN (ACCESO AL SISTEMA)  -->
@@ -94,6 +188,7 @@
                     <p id="login-intentos-info" class="texto-estado-login" aria-live="polite">Intentos disponibles: 3</p>
                 </div>
             </section>
+
 
 
             <!-- ============================================================ -->
@@ -153,6 +248,7 @@
                     </button>
                 </div>
             </section>
+
 
 
             <!-- ============================== -->
@@ -227,6 +323,7 @@
                     </div>
                 </div>
             </section>
+
 
 
             <!-- ====================================== -->
@@ -335,6 +432,7 @@
             </section>
 
 
+
             <!-- ============================== -->
             <!--  5. VISTA FORMULARIO CLIENTES  -->
             <!-- ============================== -->
@@ -430,6 +528,7 @@
             </section>
 
 
+
             <!-- ================================= -->
             <!--  6. VISTA FORMULARIO PROVEEDORES  -->
             <!-- ================================= -->
@@ -523,6 +622,7 @@
                     </div>
                 </div>
             </section>
+
 
 
             <!-- ======================================== -->
@@ -625,6 +725,7 @@
             </section>
 
 
+
             <!-- ================================= -->
             <!--  8. VISTA FORMULARIO FACTURACIÓN  -->
             <!-- ================================= -->
@@ -673,6 +774,7 @@
                         <button type="button" class="btn btn-azul" onclick="modificarFactura()" data-i18n="fac_btn_modificar">Modificar Facturación</button>
                         <button type="button" class="btn btn-rojo" onclick="eliminarFactura()" data-i18n="fac_btn_eliminar">Eliminar Facturación</button>
                         <button type="button" class="btn btn-gris" onclick="limpiarFormularioFacturacion()" data-i18n="btn_limpiar">Limpiar</button>
+                        <button type="button" id="btn-fac-imprimir" class="btn btn-teal" onclick="abrirVistaPreviaFacturaWeb()" data-i18n="fac_btn_imprimir">Imprimir Factura</button>
                     </div>
                 </div>
 
@@ -714,6 +816,7 @@
                     </div>
                 </div>
             </section>
+
 
 
             <!-- ================================================= -->
@@ -763,6 +866,7 @@
             </section>
 
 
+            
             <!-- =================================================== -->
             <!--  10. VISTA ANALÍTICA DE VENTAS (TABLERO BI - OLAP)  -->
             <!-- =================================================== -->

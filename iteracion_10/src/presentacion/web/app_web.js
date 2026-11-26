@@ -43,6 +43,7 @@ let cacheClientes = [];
 let cacheProveedores = [];
 let cacheProductos = [];
 let cacheFacturas = [];
+let cacheFacturasVisibles = [];
 let cacheRegistrosBI = [];
 let cacheTop10BI = [];
 let cacheMensualBI = [];
@@ -54,16 +55,20 @@ let mapaProveedoresNombreAId = {};
 let mapaProveedoresIdANombre = {};
 let mapaProductosCodigoAObj = {};
 let mapaProductosIdAObj = {};
+let mapaVendedoresIdAObj = {};
+let mapaClientesIdAObj = {};
 let stockPrevioPorId = {};
 let facturaSeleccionadaCache = null;
 let totalAcumuladoFacturacion = 0.0;
 let porcentajeGlobalActivo = 0.0;
+let modoImpresionWeb = "todo";
 let estadoSQLMeta = { clave: "sql_est_esp", kwargs: {}, textoLibre: null, tipo: "muted" };
 
 
-// ==============================================================================
+
+// ==========================================================================
 //  1. MOTOR DE INTERNACIONALIZACIÓN (ES / EN), TEMAS Y ACCESIBILIDAD (WCAG)
-// ==============================================================================
+// ==========================================================================
 
 const ROLES_A_EN = {
     "Administrador": "Administrator",
@@ -76,7 +81,7 @@ const ROLES_A_EN = {
 
 const TRADUCCIONES_WEB = {
     es: {
-        // Preferencias y comunes
+        // Preferencias y comunes.
         btn_idioma: "EN",
         btn_tema_oscuro: "Oscuro",
         btn_tema_claro: "Claro",
@@ -95,7 +100,7 @@ const TRADUCCIONES_WEB = {
         sin_cred: "[Sin Credenciales]",
         sel_rol: "Seleccione un rol...",
 
-        // Alertas comunes
+        // Alertas comunes.
         val_tit: "Validación",
         err_com_tit: "Error de Comunicación",
         err_tx_tit: "Error de Transacción",
@@ -107,7 +112,7 @@ const TRADUCCIONES_WEB = {
         err_fmt_tit: "Error de Formato",
         err_sel_tit: "Selección Requerida",
 
-        // Login
+        // Login.
         login_sub: "Sistema de Gestión Comercial — Acceso LAN",
         login_usu: "Usuario",
         login_usu_ph: "Ej: admin",
@@ -123,7 +128,7 @@ const TRADUCCIONES_WEB = {
         login_bloq_tit: "Bloqueo de Seguridad",
         login_bloq_msg: "Superaste el límite de intentos fallidos. Recargá la página o contactá al Administrador.",
 
-        // Panel
+        // Panel.
         panel_saludo: "BIENVENIDO/A, {nombre}",
         panel_sub: "Panel Operativo — Permisos habilitados para: {rol}",
         panel_clientes: "Gestión de Clientes",
@@ -140,7 +145,7 @@ const TRADUCCIONES_WEB = {
         bkp_ok_msg: "Copia de seguridad descargada en tu dispositivo como:\n{archivo}",
         bkp_err_tit: "Error de Backup",
 
-        // Usuarios
+        // Usuarios.
         usu_header: "GESTIÓN DE USUARIOS Y CREDENCIALES (IAM)",
         usu_nombres: "Nombres *",
         usu_nombres_ph: "Nombre del usuario",
@@ -161,7 +166,7 @@ const TRADUCCIONES_WEB = {
         col_nombres: "Nombres",
         col_apellidos: "Apellidos",
 
-        // Empleados
+        // Empleados.
         emp_header: "RECURSOS HUMANOS — LEGAJOS DE EMPLEADOS",
         emp_dni: "DNI",
         emp_tel: "Teléfono",
@@ -187,7 +192,7 @@ const TRADUCCIONES_WEB = {
         col_cp: "CP",
         col_rol: "Rol",
 
-        // Clientes
+        // Clientes.
         cli_header: "GESTIÓN DE CLIENTES",
         cli_cp: "Código Postal",
         cli_btn_guardar: "Guardar Cliente",
@@ -197,7 +202,7 @@ const TRADUCCIONES_WEB = {
         cli_req: "Nombres y Apellidos son obligatorios.",
         cli_sel_req: "Tocá primero un cliente de la tabla.",
 
-        // Proveedores
+        // Proveedores.
         prov_header: "GESTIÓN DE PROVEEDORES",
         prov_razon: "Razón Social *",
         prov_cuit: "CUIT",
@@ -212,7 +217,7 @@ const TRADUCCIONES_WEB = {
         col_cuit: "CUIT",
         col_contacto: "Contacto",
 
-        // Stock
+        // Stock.
         stk_header: "CONTROL DE STOCK E INVENTARIO",
         stk_codigo: "Código *",
         stk_desc: "Descripción *",
@@ -244,7 +249,7 @@ const TRADUCCIONES_WEB = {
         col_ubic: "Ubicación",
         col_venc: "Vencimiento",
 
-        // Facturación
+        // Facturación.
         fac_header: "FACTURACIÓN Y OPERACIONES COMERCIALES",
         fac_vendedor: "Datos del Vendedor *",
         fac_cliente: "Datos del Cliente *",
@@ -258,6 +263,7 @@ const TRADUCCIONES_WEB = {
         fac_btn_guardar: "Guardar Facturación",
         fac_btn_modificar: "Modificar Facturación",
         fac_btn_eliminar: "Eliminar Facturación",
+        fac_btn_imprimir: "Imprimir Factura",
         fac_total: "TOTAL FACTURA: $ {monto}",
         fac_total_desc: "Total con descuento ({pct}%): $ {monto}",
         fac_aplicar_desc: "APLICAR DESCUENTO GLOBAL",
@@ -271,13 +277,31 @@ const TRADUCCIONES_WEB = {
         fac_rep_tit: "Alerta de Reposición",
         fac_rep_msg: "El producto llegó a su stock mínimo. Quedan {u} unidades.",
         fac_desc_rango: "El descuento global debe estar entre 0 y 100%.",
+        fac_imp_vacio: "No hay operaciones cargadas en la tabla para imprimir.",
+        fac_imp_win: "VISTA PREVIA DE FACTURA — IMPRESIÓN / PDF",
+        fac_imp_sub: "Comprobante Comercial — FRANKIE GESTOR",
+        fac_imp_modo_todo: "Tabla Completa",
+        fac_imp_modo_sel: "Ítem Seleccionado",
+        fac_imp_btn_web: "Imprimir / Guardar PDF",
+        fac_imp_nro: "Comprobante N°",
+        fac_imp_resumen: "Resumen Consolidado ({n} ítems)",
+        fac_imp_fecha: "Fecha de emisión",
+        fac_imp_vendedor: "Vendedor",
+        fac_imp_cliente: "Cliente",
+        fac_imp_dni: "DNI",
+        fac_imp_domicilio: "Domicilio",
+        fac_imp_subtotal: "Subtotal",
+        fac_imp_desc_global: "Descuento Global ({pct}%)",
+        fac_imp_total_final: "TOTAL A PAGAR",
+        fac_imp_pie: "Documento comercial interno — No válido como factura fiscal — Generado por FRANKIE GESTOR",
+        fac_imp_varios: "Varios / Ver detalle",
         col_prod: "Producto",
         col_cant: "Cantidad",
         col_valor: "Valor en $",
         col_desc_pct: "Descuento en %",
         col_total: "Total en $",
 
-        // Consola SQL
+        // Consola SQL.
         sql_header: "CONSOLA SQL — AUDITORÍA EN SANDBOX (SOLO LECTURA)",
         sql_ingrese: "Ingresá tu sentencia SQL (SELECT):",
         sql_btn_ejec: "Ejecutar Consulta",
@@ -291,7 +315,7 @@ const TRADUCCIONES_WEB = {
         sql_bloq_msg: "Transacción abortada. Operación destructiva detectada.\nEsta consola es de Solo Lectura (SELECT).",
         sql_solo_sel: "Error SQL: Solo se admiten sentencias que comiencen con SELECT.",
 
-        // Analítica BI
+        // Analítica BI.
         bi_header: "TABLERO DE CONTROL — ANALÍTICA BI / OLAP",
         bi_sub_ini: "Análisis estadístico en tiempo real",
         bi_sub_vacio: "Sin ventas registradas para analizar",
@@ -313,7 +337,7 @@ const TRADUCCIONES_WEB = {
         col_total_cob: "Total Cobrado"
     },
     en: {
-        // Common & preferences
+        // Common & preferences.
         btn_idioma: "ES",
         btn_tema_oscuro: "Dark",
         btn_tema_claro: "Light",
@@ -332,7 +356,7 @@ const TRADUCCIONES_WEB = {
         sin_cred: "[No Credentials]",
         sel_rol: "Select a role...",
 
-        // Common alerts
+        // Common alerts.
         val_tit: "Validation",
         err_com_tit: "Communication Error",
         err_tx_tit: "Transaction Error",
@@ -344,7 +368,7 @@ const TRADUCCIONES_WEB = {
         err_fmt_tit: "Format Error",
         err_sel_tit: "Selection Required",
 
-        // Login
+        // Login.
         login_sub: "Commercial Management System — LAN Access",
         login_usu: "Username",
         login_usu_ph: "e.g. admin",
@@ -360,7 +384,7 @@ const TRADUCCIONES_WEB = {
         login_bloq_tit: "Security Lockout",
         login_bloq_msg: "Maximum failed attempts exceeded. Reload the page or contact an Administrator.",
 
-        // Dashboard
+        // Dashboard.
         panel_saludo: "WELCOME, {nombre}",
         panel_sub: "Operations Dashboard — Enabled permissions for: {rol}",
         panel_clientes: "Customer Management",
@@ -377,7 +401,7 @@ const TRADUCCIONES_WEB = {
         bkp_ok_msg: "Backup downloaded to your device as:\n{archivo}",
         bkp_err_tit: "Backup Error",
 
-        // Users
+        // Users.
         usu_header: "USER & CREDENTIALS MANAGEMENT (IAM)",
         usu_nombres: "First Name *",
         usu_nombres_ph: "User first name",
@@ -398,7 +422,7 @@ const TRADUCCIONES_WEB = {
         col_nombres: "First Name",
         col_apellidos: "Last Name",
 
-        // Employees
+        // Employees.
         emp_header: "HUMAN RESOURCES — EMPLOYEE RECORDS",
         emp_dni: "ID / DNI",
         emp_tel: "Phone",
@@ -424,7 +448,7 @@ const TRADUCCIONES_WEB = {
         col_cp: "ZIP",
         col_rol: "Role",
 
-        // Customers
+        // Customers.
         cli_header: "CUSTOMER MANAGEMENT",
         cli_cp: "Postal Code",
         cli_btn_guardar: "Save Customer",
@@ -434,7 +458,7 @@ const TRADUCCIONES_WEB = {
         cli_req: "First Name and Last Name are required.",
         cli_sel_req: "Tap a customer row from the table first.",
 
-        // Suppliers
+        // Suppliers.
         prov_header: "SUPPLIER MANAGEMENT",
         prov_razon: "Company Name *",
         prov_cuit: "Tax ID (CUIT)",
@@ -449,7 +473,7 @@ const TRADUCCIONES_WEB = {
         col_cuit: "CUIT",
         col_contacto: "Contact",
 
-        // Stock
+        // Stock.
         stk_header: "INVENTORY & STOCK CONTROL",
         stk_codigo: "SKU / Code *",
         stk_desc: "Description *",
@@ -481,7 +505,7 @@ const TRADUCCIONES_WEB = {
         col_ubic: "Location",
         col_venc: "Expiration",
 
-        // Invoicing
+        // Invoicing.
         fac_header: "INVOICING & COMMERCIAL OPERATIONS",
         fac_vendedor: "Salesperson *",
         fac_cliente: "Customer *",
@@ -495,6 +519,7 @@ const TRADUCCIONES_WEB = {
         fac_btn_guardar: "Save Invoice",
         fac_btn_modificar: "Update Invoice",
         fac_btn_eliminar: "Delete Invoice",
+        fac_btn_imprimir: "Print Invoice",
         fac_total: "INVOICE TOTAL: $ {monto}",
         fac_total_desc: "Total with discount ({pct}%): $ {monto}",
         fac_aplicar_desc: "APPLY GLOBAL DISCOUNT",
@@ -508,13 +533,31 @@ const TRADUCCIONES_WEB = {
         fac_rep_tit: "Restock Alert",
         fac_rep_msg: "Product reached minimum stock level. {u} units remaining.",
         fac_desc_rango: "Global discount must be between 0 and 100%.",
+        fac_imp_vacio: "There are no invoice records in the table to print.",
+        fac_imp_win: "INVOICE PREVIEW — PRINT / PDF",
+        fac_imp_sub: "Commercial Receipt — FRANKIE GESTOR",
+        fac_imp_modo_todo: "Full Table",
+        fac_imp_modo_sel: "Selected Item",
+        fac_imp_btn_web: "Print / Save PDF",
+        fac_imp_nro: "Invoice #",
+        fac_imp_resumen: "Consolidated Summary ({n} items)",
+        fac_imp_fecha: "Issue Date",
+        fac_imp_vendedor: "Salesperson",
+        fac_imp_cliente: "Customer",
+        fac_imp_dni: "ID / DNI",
+        fac_imp_domicilio: "Address",
+        fac_imp_subtotal: "Subtotal",
+        fac_imp_desc_global: "Global Discount ({pct}%)",
+        fac_imp_total_final: "TOTAL DUE",
+        fac_imp_pie: "Internal commercial receipt — Not a fiscal invoice — Generated by FRANKIE GESTOR",
+        fac_imp_varios: "Multiple / See detail",
         col_prod: "Product",
         col_cant: "Qty",
         col_valor: "Unit Price $",
         col_desc_pct: "Discount %",
         col_total: "Total $",
 
-        // SQL Console
+        // SQL Console.
         sql_header: "SQL CONSOLE — SANDBOX AUDIT (READ-ONLY)",
         sql_ingrese: "Enter your SQL query (SELECT):",
         sql_btn_ejec: "Run Query",
@@ -528,7 +571,7 @@ const TRADUCCIONES_WEB = {
         sql_bloq_msg: "Transaction aborted. Destructive operation detected.\nThis console is Read-Only (SELECT).",
         sql_solo_sel: "SQL Error: Only SELECT statements are allowed.",
 
-        // BI Analytics
+        // BI Analytics.
         bi_header: "CONTROL DASHBOARD — BI / OLAP ANALYTICS",
         bi_sub_ini: "Real-time statistical analysis",
         bi_sub_vacio: "No sales records available for analysis",
@@ -566,7 +609,7 @@ function rolAUI(rolCanonico) {
 }
 
 function valorVisual(valor) {
-    return valor && valor !== "S/D" ? valor : tWeb("sin_dato");
+    return valor && valor !== "S/D" && valor !== "N/A" ? valor : tWeb("sin_dato");
 }
 
 function guardarPreferenciasSesion() {
@@ -650,6 +693,12 @@ function aplicarPreferenciasUI() {
         actualizarSubtituloBI();
     }
 
+    // Si el modal de vista previa de factura está abierto, refresca su contenido traducido.
+    const modalImp = document.getElementById("modal-impresion-factura");
+    if (modalImp && !modalImp.classList.contains("oculto")) {
+        renderizarVistaPreviaFacturaWeb();
+    }
+
     // Redibuja los 3 gráficos BI con los colores del tema activo.
     const vistaBI = document.getElementById("vista-analitica");
     if (vistaBI && vistaBI.classList.contains("activa")) {
@@ -708,9 +757,10 @@ function ajustarEscalaWeb(delta) {
 }
 
 
-// ==============================================================================
+
+// =======================================================================
 //  2. CLIENTE HTTP ASÍNCRONO CENTRALIZADO (EQUIVALENTE A CLIENTE_API.PY)
-// ==============================================================================
+// =======================================================================
 
 async function peticionAPI(ruta, metodo = "GET", cuerpo = null) {
     const cabeceras = {
@@ -759,9 +809,10 @@ async function peticionAPI(ruta, metodo = "GET", cuerpo = null) {
 }
 
 
-// ==============================================================================
+
+// =============================================================
 //  3. SISTEMA DE CUADROS DE DIÁLOGO (EQUIVALENTE A MESSAGEBOX)
-// ==============================================================================
+// =============================================================
 
 function mostrarAlerta(titulo, mensaje, tipo = "info") {
     const modal = document.getElementById("modal-alerta");
@@ -781,11 +832,14 @@ function cerrarAlerta() {
 }
 
 
-// ==============================================================================
+
+// ============================================================
 //  4. NAVEGACIÓN ENTRE VISTAS (SPA) Y MATRIZ DE PERMISOS RBAC
-// ==============================================================================
+// ============================================================
 
 function navegarA(idVista) {
+    cerrarVistaPreviaFacturaWeb();
+
     document.querySelectorAll(".vista-app").forEach(seccion => {
         seccion.classList.remove("activa");
     });
@@ -874,9 +928,10 @@ function aplicarMatrizRBACPanel(rolUsuario) {
 }
 
 
-// ==============================================================================
+
+// ====================================================
 //  5. MÓDULO DE LOGIN, CIERRE DE SESIÓN Y BACKUP JSON
-// ==============================================================================
+// ====================================================
 
 async function validarIngreso(evento) {
     evento.preventDefault();
@@ -989,9 +1044,10 @@ async function generarBackupWeb() {
 }
 
 
-// ==============================================================================
+
+// ========================================
 //  6. MÓDULO DE GESTIÓN DE USUARIOS (IAM)
-// ==============================================================================
+// ========================================
 
 function configurarComboRolesUsuarios(conservarSeleccion = false) {
     const selectRol = document.getElementById("usu-rol");
@@ -1155,9 +1211,10 @@ async function eliminarUsuario() {
 }
 
 
-// ==============================================================================
+
+// ==============================================================
 //  7. MÓDULO DE RECURSOS HUMANOS (EMPLEADOS — PERSISTENCIA 3FN)
-// ==============================================================================
+// ==============================================================
 
 function limpiarFormularioEmpleados() {
     document.getElementById("emp-id-seleccionado").value = "";
@@ -1325,9 +1382,10 @@ async function eliminarEmpleado() {
 }
 
 
-// ==============================================================================
+
+// =====================================================
 //  8. MÓDULO DE GESTIÓN DE CLIENTES (PERSISTENCIA 3FN)
-// ==============================================================================
+// =====================================================
 
 function limpiarFormularioClientes() {
     document.getElementById("cli-id-seleccionado").value = "";
@@ -1483,9 +1541,10 @@ async function eliminarCliente() {
 }
 
 
-// ==============================================================================
+
+// ========================================================
 //  9. MÓDULO DE GESTIÓN DE PROVEEDORES (PERSISTENCIA 3FN)
-// ==============================================================================
+// ========================================================
 
 function limpiarFormularioProveedores() {
     document.getElementById("prov-id-seleccionado").value = "";
@@ -1647,9 +1706,10 @@ async function eliminarProveedor() {
 }
 
 
-// ==============================================================================
+
+// =======================================================================
 //  10. MÓDULO DE CONTROL DE STOCK E INVENTARIO (3FN + SEMÁFORO DE STOCK)
-// ==============================================================================
+// =======================================================================
 
 function limpiarFormularioStock() {
     document.getElementById("stk-id-seleccionado").value = "";
@@ -1893,9 +1953,10 @@ async function eliminarProducto() {
 }
 
 
-// ==============================================================================
-//  11. MÓDULO DE FACTURACIÓN Y OPERACIONES COMERCIALES
-// ==============================================================================
+
+// ======================================================================
+//  11. MÓDULO DE FACTURACIÓN, OPERACIONES COMERCIALES E IMPRESIÓN / PDF
+// ======================================================================
 
 function limpiarFormularioFacturacion() {
     document.getElementById("fac-id-seleccionado").value = "";
@@ -1924,6 +1985,7 @@ function renderizarTablaFacturacion() {
     const tbody = document.querySelector("#tabla-facturacion tbody");
     const filtro = (document.getElementById("buscar-facturacion").value || "").trim().toLowerCase();
     tbody.innerHTML = "";
+    cacheFacturasVisibles = [];
     let visibles = 0;
 
     cacheFacturas.forEach(f => {
@@ -1935,6 +1997,8 @@ function renderizarTablaFacturacion() {
 
         const texto = `${f.id} ${etiquetaProd} ${f.cantidad} ${f.valor} ${f.descuento} ${totalFila.toFixed(2)}`.toLowerCase();
         if (filtro && !texto.includes(filtro)) return;
+
+        cacheFacturasVisibles.push(f);
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -1960,7 +2024,8 @@ function renderizarTablaFacturacion() {
                 id_producto: f.id_producto,
                 etiquetaProd: etiquetaProd,
                 cantidad: Number(f.cantidad),
-                descuento: Number(f.descuento || 0)
+                descuento: Number(f.descuento || 0),
+                raw: f
             };
         });
 
@@ -1986,6 +2051,8 @@ async function cargarDatosFacturacion() {
 
     mapaProductosCodigoAObj = {};
     mapaProductosIdAObj = {};
+    mapaVendedoresIdAObj = {};
+    mapaClientesIdAObj = {};
 
     try {
         const [vendedores, clientes, productos, facturas] = await Promise.all([
@@ -1996,6 +2063,7 @@ async function cargarDatosFacturacion() {
         ]);
 
         vendedores.forEach(v => {
+            mapaVendedoresIdAObj[v.id] = v;
             const etiqueta = `${v.nombres} ${v.apellidos} (ID: ${v.id})`;
             const opt = document.createElement("option");
             opt.value = etiqueta;
@@ -2004,6 +2072,7 @@ async function cargarDatosFacturacion() {
         });
 
         clientes.forEach(c => {
+            mapaClientesIdAObj[c.id] = c;
             const etiqueta = `${c.nombres} ${c.apellidos} (ID: ${c.id})`;
             const opt = document.createElement("option");
             opt.value = etiqueta;
@@ -2208,10 +2277,222 @@ async function eliminarFactura() {
     }
 }
 
+// --- Vista Previa e Impresión / PDF de Factura (Opción B - Dual). ---
 
-// ==============================================================================
+function formatearFechaActualLocal() {
+    const ahora = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    return `${ahora.getFullYear()}-${pad(ahora.getMonth() + 1)}-${pad(ahora.getDate())} ${pad(ahora.getHours())}:${pad(ahora.getMinutes())}`;
+}
+
+function formatearDomicilioPerfil(perfil) {
+    if (!perfil) return tWeb("sin_dato");
+    const partes = ["direccion", "ciudad", "provincia", "cp"]
+        .map(c => (perfil[c] || "").trim())
+        .filter(v => v && v !== "S/D" && v !== "N/A");
+    return partes.length > 0 ? partes.join(", ") : tWeb("sin_dato");
+}
+
+function construirDatosComprobanteWeb(modo = "todo") {
+    let origen;
+    let porcentajeGlobal;
+
+    if (modo === "seleccionada" && facturaSeleccionadaCache && facturaSeleccionadaCache.raw) {
+        origen = [facturaSeleccionadaCache.raw];
+        porcentajeGlobal = 0.0;
+    } else {
+        modo = "todo";
+        origen = cacheFacturasVisibles.length > 0 ? cacheFacturasVisibles : cacheFacturas;
+        porcentajeGlobal = Number(porcentajeGlobalActivo || 0.0);
+    }
+
+    const items = [];
+    let subtotal = 0.0;
+    const idsVendedores = new Set();
+    const idsClientes = new Set();
+
+    origen.forEach(f => {
+        const prod = mapaProductosIdAObj[f.id_producto];
+        const etiquetaProd = prod ? `${prod.codigo} - ${prod.descripcion}` : `ID ${f.id_producto}`;
+        const cantidad = Number(f.cantidad || 0);
+        const valor = Number(f.valor || 0);
+        const descuento = Number(f.descuento || 0);
+        const totalFila = f.total !== null && f.total !== undefined
+            ? Number(f.total)
+            : (cantidad * valor) * (1.0 - (descuento / 100.0));
+
+        subtotal += totalFila;
+        if (f.id_vendedor !== null && f.id_vendedor !== undefined) idsVendedores.add(Number(f.id_vendedor));
+        if (f.id_cliente !== null && f.id_cliente !== undefined) idsClientes.add(Number(f.id_cliente));
+
+        items.push({
+            id: f.id,
+            producto: etiquetaProd,
+            cantidad,
+            valor,
+            descuento,
+            total: totalFila,
+            fecha: String(f.fecha || "").slice(0, 19)
+        });
+    });
+
+    const descuentoMonto = subtotal * (porcentajeGlobal / 100.0);
+    const totalFinal = subtotal - descuentoMonto;
+
+    let vendedorTxt = tWeb("sin_dato");
+    if (idsVendedores.size === 1) {
+        const idV = Array.from(idsVendedores)[0];
+        const vObj = mapaVendedoresIdAObj[idV];
+        vendedorTxt = vObj ? `${vObj.nombres} ${vObj.apellidos} (ID: ${idV})` : `ID ${idV}`;
+    } else if (idsVendedores.size > 1) {
+        vendedorTxt = tWeb("fac_imp_varios");
+    }
+
+    let clienteTxt = tWeb("sin_dato");
+    let dniTxt = tWeb("sin_dato");
+    let domicilioTxt = tWeb("sin_dato");
+    if (idsClientes.size === 1) {
+        const idC = Array.from(idsClientes)[0];
+        const cObj = mapaClientesIdAObj[idC];
+        if (cObj) {
+            clienteTxt = `${cObj.nombres} ${cObj.apellidos} (ID: ${idC})`;
+            dniTxt = valorVisual(cObj.dni);
+            domicilioTxt = formatearDomicilioPerfil(cObj);
+        } else {
+            clienteTxt = `ID ${idC}`;
+        }
+    } else if (idsClientes.size > 1) {
+        clienteTxt = tWeb("fac_imp_varios");
+    }
+
+    const nroTxt = modo === "seleccionada" && items.length > 0
+        ? `#${String(items[0].id).padStart(6, "0")}`
+        : tWeb("fac_imp_resumen", { n: items.length });
+
+    const fechaTxt = modo === "seleccionada" && items.length > 0 && items[0].fecha
+        ? items[0].fecha
+        : formatearFechaActualLocal();
+
+    return {
+        modo,
+        nro: nroTxt,
+        fecha: fechaTxt,
+        vendedor: vendedorTxt,
+        cliente: clienteTxt,
+        dni: dniTxt,
+        domicilio: domicilioTxt,
+        items,
+        subtotal,
+        porcentajeGlobal,
+        descuentoMonto,
+        totalFinal
+    };
+}
+
+function renderizarVistaPreviaFacturaWeb() {
+    const datos = construirDatosComprobanteWeb(modoImpresionWeb);
+
+    document.getElementById("imp-nro").textContent = datos.nro;
+    document.getElementById("imp-fecha").textContent = `${tWeb("fac_imp_fecha")}: ${datos.fecha}`;
+    document.getElementById("imp-cliente").textContent = datos.cliente;
+    document.getElementById("imp-vendedor").textContent = datos.vendedor;
+    document.getElementById("imp-dni").textContent = datos.dni;
+    document.getElementById("imp-domicilio").textContent = datos.domicilio;
+
+    const tbody = document.querySelector("#tabla-impresion-factura tbody");
+    tbody.innerHTML = "";
+    datos.items.forEach(it => {
+        const tr = document.createElement("tr");
+
+        const tdId = document.createElement("td");
+        tdId.textContent = `#${it.id}`;
+
+        const tdProd = document.createElement("td");
+        tdProd.textContent = it.producto;
+
+        const tdCant = document.createElement("td");
+        tdCant.className = "num";
+        tdCant.textContent = String(it.cantidad);
+
+        const tdVal = document.createElement("td");
+        tdVal.className = "num";
+        tdVal.textContent = `$ ${formatearMoneda(it.valor)}`;
+
+        const tdDesc = document.createElement("td");
+        tdDesc.className = "num";
+        tdDesc.textContent = `${it.descuento}%`;
+
+        const tdTot = document.createElement("td");
+        tdTot.className = "num";
+        const strongTot = document.createElement("strong");
+        strongTot.textContent = `$ ${formatearMoneda(it.total)}`;
+        tdTot.appendChild(strongTot);
+
+        tr.append(tdId, tdProd, tdCant, tdVal, tdDesc, tdTot);
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById("imp-subtotal").textContent = `$ ${formatearMoneda(datos.subtotal)}`;
+
+    const filaDesc = document.getElementById("imp-fila-desc-global");
+    if (datos.porcentajeGlobal > 0) {
+        filaDesc.classList.remove("oculto");
+        document.getElementById("imp-desc-global-lbl").textContent =
+            tWeb("fac_imp_desc_global", { pct: datos.porcentajeGlobal });
+        document.getElementById("imp-desc-global-monto").textContent =
+            `- $ ${formatearMoneda(datos.descuentoMonto)}`;
+    } else {
+        filaDesc.classList.add("oculto");
+    }
+
+    document.getElementById("imp-total-final").textContent = `$ ${formatearMoneda(datos.totalFinal)}`;
+
+    const btnTodo = document.getElementById("btn-imp-modo-todo");
+    const btnSel = document.getElementById("btn-imp-modo-sel");
+    if (btnTodo && btnSel) {
+        const esTodo = datos.modo === "todo";
+        btnTodo.className = `btn btn-sm ${esTodo ? "btn-azul" : "btn-gris"}`;
+        btnSel.className = `btn btn-sm ${!esTodo ? "btn-azul" : "btn-gris"}`;
+    }
+}
+
+function abrirVistaPreviaFacturaWeb() {
+    if (cacheFacturas.length === 0) {
+        mostrarAlerta(tWeb("val_tit"), tWeb("fac_imp_vacio"), "warning");
+        return;
+    }
+
+    // Opción B: arranca siempre mostrando la tabla completa más descuentos globales.
+    modoImpresionWeb = "todo";
+
+    const barraModo = document.getElementById("imp-barra-modo");
+    const tieneSeleccion = Boolean(facturaSeleccionadaCache && facturaSeleccionadaCache.raw);
+    barraModo.classList.toggle("oculto", !tieneSeleccion);
+
+    renderizarVistaPreviaFacturaWeb();
+    document.getElementById("modal-impresion-factura").classList.remove("oculto");
+    document.getElementById("btn-imp-web-print").focus();
+}
+
+function cambiarModoImpresionWeb(nuevoModo) {
+    modoImpresionWeb = nuevoModo === "seleccionada" ? "seleccionada" : "todo";
+    renderizarVistaPreviaFacturaWeb();
+}
+
+function cerrarVistaPreviaFacturaWeb() {
+    const modal = document.getElementById("modal-impresion-factura");
+    if (modal) modal.classList.add("oculto");
+}
+
+function imprimirFacturaWeb() {
+    window.print();
+}
+
+
+
+// =====================================================================
 //  12. CONSOLA SQL DE AUDITORÍA (SANDBOX DE SOLO LECTURA EN NAVEGADOR)
-// ==============================================================================
+// =====================================================================
 
 function actualizarEstadoSQLVisual() {
     const labelEstado = document.getElementById("sql-estado");
@@ -2360,9 +2641,10 @@ function renderizarGrillaSQL(columnas, filas) {
 }
 
 
-// ==============================================================================
+
+// ===========================================================================
 //  13. MÓDULO DE ANALÍTICA DE VENTAS (BI / OLAP Y CANVAS ANTI-SUPERPOSICIÓN)
-// ==============================================================================
+// ===========================================================================
 
 function actualizarSubtituloBI() {
     const elSub = document.getElementById("bi-subtitulo-estrella");
@@ -2743,9 +3025,10 @@ function dibujarGraficoTorta(idCanvas, datos) {
 }
 
 
-// ==============================================================================
+
+// ==================================================================
 //  14. UTILIDADES VISUALES, ATAJOS DE TECLADO WCAG E INICIALIZACIÓN
-// ==============================================================================
+// ==================================================================
 
 function marcarFilaSeleccionada(idTabla, filaActiva) {
     desmarcarFilasTabla(idTabla);
@@ -2765,14 +3048,20 @@ function formatearMoneda(numero) {
     });
 }
 
-// Atajos globales de accesibilidad: Esc (cerrar modal / volver al panel), Ctrl+F (buscar en tabla), Ctrl+Enter (SQL).
+// Atajos globales de accesibilidad: Esc (cerrar modales / volver al panel), Ctrl+F (buscar en tabla), Ctrl+Enter (SQL).
 document.addEventListener("keydown", evento => {
-    const modal = document.getElementById("modal-alerta");
-    const modalAbierto = modal && !modal.classList.contains("oculto");
+    const modalAlerta = document.getElementById("modal-alerta");
+    const alertaAbierta = modalAlerta && !modalAlerta.classList.contains("oculto");
+    const modalImp = document.getElementById("modal-impresion-factura");
+    const impAbierto = modalImp && !modalImp.classList.contains("oculto");
 
     if (evento.key === "Escape") {
-        if (modalAbierto) {
+        if (alertaAbierta) {
             cerrarAlerta();
+            return;
+        }
+        if (impAbierto) {
+            cerrarVistaPreviaFacturaWeb();
             return;
         }
         const vistaActiva = document.querySelector(".vista-app.activa");
